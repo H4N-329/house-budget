@@ -95,7 +95,7 @@
       line-height: 1.4;
     }
 
-    /* ビュー切り替え（ホーム / グラフ / 履歴 / 設定） */
+    /* ビュー切り替え */
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -121,23 +121,34 @@
     }
     .record-item:last-child { border-bottom: none; }
     .record-main { display: flex; flex-direction: column; gap: 2px; }
-    .record-category { font-size: 11px; background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px; display: inline-block; width: fit-content; }
+    .record-category {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      width: fit-content;
+      font-weight: bold;
+    }
+    .cat-shared { background: #e8f5e9; color: #2e7d32; }
+    .cat-personal { background: #fff3e0; color: #e65100; }
+
     .record-memo { font-size: 14px; font-weight: 500; }
     .record-sub { font-size: 11px; color: var(--text-muted); }
-    .record-right { text-align: right; display: flex; align-items: center; gap: 8px; }
+    .record-right { text-align: right; display: flex; align-items: center; gap: 6px; }
     .record-amount { font-size: 15px; font-weight: bold; }
     .amount-income { color: #2e7d32; }
     .amount-expense { color: #d32f2f; }
-    .delete-btn {
+
+    .action-btn {
       border: none;
-      background: #ffebee;
-      color: #c62828;
       border-radius: 6px;
       padding: 4px 8px;
       font-size: 11px;
       cursor: pointer;
       font-weight: bold;
     }
+    .edit-btn { background: #e3f2fd; color: #1565c0; }
+    .delete-btn { background: #ffebee; color: #c62828; }
 
     /* 入力フォーム */
     .input-bar-container {
@@ -171,7 +182,7 @@
     }
 
     .input-date { flex: 2; min-width: 110px; }
-    .select-small { flex: 1.5; min-width: 100px; }
+    .select-small { flex: 1.8; min-width: 120px; }
     .input-memo { flex: 2; min-width: 110px; }
     .input-amount { flex: 1.5; min-width: 80px; font-weight: bold; }
 
@@ -217,7 +228,7 @@
       flex-shrink: 0;
     }
 
-    /* モーダル汎用 */
+    /* モーダル */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -243,7 +254,6 @@
     .btn-cancel { background: #eee; color: #333; }
     .btn-save { background: var(--green-main); color: white; }
 
-    /* 設定項目スタイル */
     .setting-item {
       display: flex;
       justify-content: space-between;
@@ -361,7 +371,7 @@
     </div>
   </div>
 
-  <!-- 固定入力フォーム（ホーム・履歴時のみ表示） -->
+  <!-- 固定入力フォーム -->
   <div class="input-bar-container" id="inputBar">
     <div class="input-row">
       <button class="toggle-btn btn-type" id="btnType" onclick="toggleType()">支出</button>
@@ -374,21 +384,75 @@
     </div>
     <div class="input-row">
       <select id="selectCategory" class="select-small">
-        <option value="食料品">食料品</option>
-        <option value="日用品">日用品</option>
-        <option value="家賃">家賃 (ゆうき6:れな4)</option>
-        <option value="光熱費・住居">光熱費・住居</option>
-        <option value="外食・カフェ">外食・カフェ</option>
-        <option value="消耗品">消耗品</option>
-        <option value="サブスク・通信">サブスク・通信</option>
-        <option value="交通費">交通費</option>
-        <option value="娯楽・イベント">娯楽・イベント</option>
-        <option value="個人利用">個人利用 (折半なし)</option>
-        <option value="その他">その他</option>
+        <optgroup label="共通（折半対象）">
+          <option value="共通：食料品">共通：食料品</option>
+          <option value="共通：日用品">共通：日用品</option>
+          <option value="共通：家賃">共通：家賃 (ゆうき6:れな4)</option>
+          <option value="共通：光熱費・住居">共通：光熱費・住居</option>
+          <option value="共通：外食・カフェ">共通：外食・カフェ</option>
+          <option value="共通：消耗品">共通：消耗品</option>
+          <option value="共通：サブスク・通信">共通：サブスク・通信</option>
+          <option value="共通：交通費">共通：交通費</option>
+          <option value="共通：娯楽・イベント">共通：娯楽・イベント</option>
+          <option value="共通：その他">共通：その他</option>
+        </optgroup>
+        <optgroup label="個人（折半なし）">
+          <option value="個人：食料品">個人：食料品</option>
+          <option value="個人：日用品">個人：日用品</option>
+          <option value="個人：外食・カフェ">個人：外食・カフェ</option>
+          <option value="個人：衣服・美容">個人：衣服・美容</option>
+          <option value="個人：サブスク・通信">個人：サブスク・通信</option>
+          <option value="個人：交通費">個人：交通費</option>
+          <option value="個人：娯楽・イベント">個人：娯楽・イベント</option>
+          <option value="個人：その他">個人：その他</option>
+        </optgroup>
       </select>
       <input type="text" id="inputMemo" class="input-memo" placeholder="メモ">
       <input type="number" id="inputAmount" class="input-amount" placeholder="金額">
       <button class="add-btn" onclick="addData()">＋</button>
+    </div>
+  </div>
+
+  <!-- カテゴリ編集 モーダル -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal-content">
+      <div class="modal-title">記録の編集</div>
+      <input type="hidden" id="editRowIndex">
+      <div style="display:flex; flex-direction:column; gap:10px; margin: 12px 0;">
+        <label style="font-size:12px; font-weight:bold;">カテゴリ</label>
+        <select id="editCategory" style="width:100%; padding:8px;">
+          <optgroup label="共通（折半対象）">
+            <option value="共通：食料品">共通：食料品</option>
+            <option value="共通：日用品">共通：日用品</option>
+            <option value="共通：家賃">共通：家賃 (ゆうき6:れな4)</option>
+            <option value="共通：光熱費・住居">共通：光熱費・住居</option>
+            <option value="共通：外食・カフェ">共通：外食・カフェ</option>
+            <option value="共通：消耗品">共通：消耗品</option>
+            <option value="共通：サブスク・通信">共通：サブスク・通信</option>
+            <option value="共通：交通費">共通：交通費</option>
+            <option value="共通：娯楽・イベント">共通：娯楽・イベント</option>
+            <option value="共通：その他">共通：その他</option>
+          </optgroup>
+          <optgroup label="個人（折半なし）">
+            <option value="個人：食料品">個人：食料品</option>
+            <option value="個人：日用品">個人：日用品</option>
+            <option value="個人：外食・カフェ">個人：外食・カフェ</option>
+            <option value="個人：衣服・美容">個人：衣服・美容</option>
+            <option value="個人：サブスク・通信">個人：サブスク・通信</option>
+            <option value="個人：交通費">個人：交通費</option>
+            <option value="個人：娯楽・イベント">個人：娯楽・イベント</option>
+            <option value="個人：その他">個人：その他</option>
+          </optgroup>
+        </select>
+        <label style="font-size:12px; font-weight:bold;">メモ</label>
+        <input type="text" id="editMemo" style="width:100%; padding:8px;">
+        <label style="font-size:12px; font-weight:bold;">金額</label>
+        <input type="number" id="editAmount" style="width:100%; padding:8px;">
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn btn-cancel" onclick="closeEditModal()">キャンセル</button>
+        <button class="modal-btn btn-save" onclick="saveEdit()">保存</button>
+      </div>
     </div>
   </div>
 
@@ -425,14 +489,13 @@
   </div>
 
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwigyRtuHJCX-rCMe-LGLQ6E21A-yrwwxYNOO9ukdR24c9VJHFawPiaOutZi1p8xgyJ/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycby-s8Cy-46gmYeneR_r6mXjT9fk4YkJs4Vfn19oC1RYju8ZA5Qv5gDdpO-jH1HPUXM/exec";
 
     let currentDate = new Date();
     let currentType = "支出";
     let currentUser = "ゆうき";
     let allData = [];
     
-    // Chart インスタンス
     let chartHome = null;
     let chartPersonalShared = null;
     let chartMonthCompare = null;
@@ -440,28 +503,37 @@
 
     let tutorialStep = 0;
     const tutorialSteps = [
-      { title: "ふたり家計簿へようこそ！ (1/3)", text: "画面下の入力バーから、日付・メンバー（ゆうき/れな）・カテゴリ・金額を入力して「＋」を押すと、すぐに共有スプレッドシートに反映されます。" },
-      { title: "カメラでレシート撮影 (2/3)", text: "「📷 撮影」ボタンを押すとレシート画像から金額や項目を自動解析できます。まとめて簡単に登録が可能です。" },
-      { title: "自動で立替精算を計算 (3/3)", text: "入力された支出をもとに、今月どちらがいくら相手に支払えばよいかを自動算出します。精算が終わったら「未精算」ボタンを押して「精算済み」に記録しましょう！" }
+      { title: "ふたり家計簿へようこそ！ (1/3)", text: "画面下の入力バーから、共通・個人のカテゴリや金額を選んで「＋」を押すと、共有スプレッドシートに反映されます。" },
+      { title: "カメラでレシート撮影 (2/3)", text: "「📷 撮影」ボタンを押すとレシート画像から金額や項目を自動解析できます。まとめて登録が可能です。" },
+      { title: "自動で立替精算を計算 (3/3)", text: "共通の支出のみを対象に自動算出します。精算が終わったら「未精算」ボタンを押して「精算済み」に記録しましょう！" }
     ];
 
-    const categoryOptions = [
-      "食料品", "日用品", "外食・カフェ", "光熱費・住居",
-      "消耗品", "サブスク・通信", "交通費", "娯楽・イベント",
-      "個人利用", "家賃", "その他"
+    const categoryOptionsList = [
+      "共通：食料品", "共通：日用品", "共通：家賃 (ゆうき6:れな4)", "共通：光熱費・住居",
+      "共通：外食・カフェ", "共通：消耗品", "共通：サブスク・通信", "共通：交通費",
+      "共通：娯楽・イベント", "共通：その他",
+      "個人：食料品", "個人：日用品", "個人：外食・カフェ", "個人：衣服・美容",
+      "個人：サブスク・通信", "個人：交通費", "個人：娯楽・イベント", "個人：その他"
     ];
 
     window.onload = () => {
       document.getElementById("inputDate").valueAsDate = new Date();
-      
-      // 設定の読み込み
       initSettings();
-
       updateMonthDisplay();
       loadData();
     };
 
-    /* 設定・テーマの読み込み */
+    /* カテゴリ正規化（過去の「個人利用」や旧名称を「個人：娯楽・イベント」等に変換） */
+    function normalizeCategory(cat) {
+      if (!cat) return "共通：その他";
+      if (cat === "個人利用") return "個人：娯楽・イベント";
+      if (cat === "家賃") return "共通：家賃 (ゆうき6:れな4)";
+      if (!cat.startsWith("共通：") && !cat.startsWith("個人：")) {
+        return "共通：" + cat;
+      }
+      return cat;
+    }
+
     function initSettings() {
       const isDark = localStorage.getItem("theme_dark") === "true";
       document.getElementById("themeToggle").checked = isDark;
@@ -489,7 +561,6 @@
       localStorage.setItem("tutorial_enabled", enabled ? "true" : "false");
     }
 
-    /* チュートリアル表示制御 */
     function startTutorial() {
       tutorialStep = 0;
       updateTutorialModal();
@@ -517,7 +588,6 @@
       document.getElementById("tutorialModal").style.display = "none";
     }
 
-    /* 精算トグルボタン */
     function getSettlementKey() {
       return `settle_${currentDate.getFullYear()}_${currentDate.getMonth() + 1}`;
     }
@@ -545,7 +615,6 @@
       updateSettlementBtnDisplay();
     }
 
-    /* タブ切り替え */
     function switchTab(tabId, elem) {
       document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
       document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
@@ -553,7 +622,6 @@
       document.getElementById(tabId).classList.add("active");
       elem.classList.add("active");
 
-      // 入力バーは「設定」タブ以外で表示
       const inputBar = document.getElementById("inputBar");
       if (tabId === "tabSettings") {
         inputBar.style.display = "none";
@@ -646,7 +714,7 @@
       filtered.slice().reverse().forEach(item => {
         const amt = Number(item.amount) || 0;
         const isExp = item.type === "支出";
-        const cat = item.category || "未分類";
+        const cat = normalizeCategory(item.category);
 
         if (isExp) {
           expTotal += amt;
@@ -655,16 +723,15 @@
           if (item.user === "れな") partnerTotalExp += amt;
           else myTotalExp += amt;
 
-          if (cat === "個人利用") {
-            // 個人利用は折半対象外
-          } else if (cat === "家賃") {
-            yukiSharedTarget += amt * 0.6;
-            renaSharedTarget += amt * 0.4;
-            if (item.user === "れな") renaPaidShared += amt;
-            else yukiPaidShared += amt;
-          } else {
-            yukiSharedTarget += amt * 0.5;
-            renaSharedTarget += amt * 0.5;
+          // 共通項目のみ折半対象とする
+          if (cat.startsWith("共通：")) {
+            if (cat.includes("家賃")) {
+              yukiSharedTarget += amt * 0.6;
+              renaSharedTarget += amt * 0.4;
+            } else {
+              yukiSharedTarget += amt * 0.5;
+              renaSharedTarget += amt * 0.5;
+            }
             if (item.user === "れな") renaPaidShared += amt;
             else yukiPaidShared += amt;
           }
@@ -672,11 +739,12 @@
           incTotal += amt;
         }
 
+        const isShared = cat.startsWith("共通：");
         const li = document.createElement("li");
         li.className = "record-item";
         li.innerHTML = `
           <div class="record-main">
-            <div><span class="record-category">${cat}</span></div>
+            <div><span class="record-category ${isShared ? 'cat-shared' : 'cat-personal'}">${cat}</span></div>
             <div class="record-memo">${item.memo || item.type}</div>
             <div class="record-sub">${item.date} (${item.user})</div>
           </div>
@@ -684,7 +752,8 @@
             <span class="record-amount ${isExp ? 'amount-expense' : 'amount-income'}">
               ${isExp ? '-' : '+'}¥${amt.toLocaleString()}
             </span>
-            <button class="delete-btn" onclick="deleteData(${item.rowIndex})">削除</button>
+            <button class="action-btn edit-btn" onclick="openEditModal(${item.rowIndex}, '${cat}', '${item.memo || ''}', ${amt})">編集</button>
+            <button class="action-btn delete-btn" onclick="deleteData(${item.rowIndex})">削除</button>
           </div>
         `;
         listElement.appendChild(li);
@@ -701,11 +770,11 @@
       const splitElem = document.getElementById("splitResult");
 
       if (Math.abs(yukiDiff) < 1) {
-        splitElem.innerHTML = "精算結果: 精算の必要はありません";
+        splitElem.innerHTML = "精算結果 (共通分): 精算の必要はありません";
       } else if (yukiDiff > 0) {
-        splitElem.innerHTML = `精算結果 (共有分)<br>れな ➔ ゆうき: <b>¥${Math.round(yukiDiff).toLocaleString()}</b> 支払い`;
+        splitElem.innerHTML = `精算結果 (共通分)<br>れな ➔ ゆうき: <b>¥${Math.round(yukiDiff).toLocaleString()}</b> 支払い`;
       } else {
-        splitElem.innerHTML = `精算結果 (共有分)<br>ゆうき ➔ れな: <b>¥${Math.round(Math.abs(yukiDiff)).toLocaleString()}</b> 支払い`;
+        splitElem.innerHTML = `精算結果 (共通分)<br>ゆうき ➔ れな: <b>¥${Math.round(Math.abs(yukiDiff)).toLocaleString()}</b> 支払い`;
       }
 
       renderHomeChart(categoryTotals);
@@ -735,7 +804,6 @@
       });
     }
 
-    /* 分析タブのグラフ群描画 */
     function renderAnalytics() {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -746,11 +814,11 @@
         return d.getFullYear() === year && d.getMonth() === month;
       });
 
-      // 1. 個人 vs 共通 グラフ
       let yukiPersonal = 0, renaPersonal = 0, sharedTotal = 0;
       currentFiltered.forEach(i => {
         const amt = Number(i.amount) || 0;
-        if (i.category === "個人利用") {
+        const cat = normalizeCategory(i.category);
+        if (cat.startsWith("個人：")) {
           if (i.user === "れな") renaPersonal += amt;
           else yukiPersonal += amt;
         } else {
@@ -769,7 +837,6 @@
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
       });
 
-      // 2. 先月との比較 グラフ
       const prevDate = new Date(year, month - 1, 1);
       const prevFiltered = allData.filter(item => {
         if (!item.date || item.type !== "支出") return false;
@@ -778,8 +845,14 @@
       });
 
       const curCat = {}, prevCat = {};
-      currentFiltered.forEach(i => curCat[i.category] = (curCat[i.category] || 0) + (Number(i.amount) || 0));
-      prevFiltered.forEach(i => prevCat[i.category] = (prevCat[i.category] || 0) + (Number(i.amount) || 0));
+      currentFiltered.forEach(i => {
+        const cat = normalizeCategory(i.category);
+        curCat[cat] = (curCat[cat] || 0) + (Number(i.amount) || 0);
+      });
+      prevFiltered.forEach(i => {
+        const cat = normalizeCategory(i.category);
+        prevCat[cat] = (prevCat[cat] || 0) + (Number(i.amount) || 0);
+      });
 
       const allCats = Array.from(new Set([...Object.keys(curCat), ...Object.keys(prevCat)]));
       const ctxMC = document.getElementById('monthCompareChart').getContext('2d');
@@ -796,13 +869,11 @@
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
       });
 
-      // 3. 過去6ヶ月の推移 グラフ
       const trendLabels = [];
       const trendData = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(year, month - i, 1);
-        const label = `${d.getMonth() + 1}月`;
-        trendLabels.push(label);
+        trendLabels.push(`${d.getMonth() + 1}月`);
 
         const mExp = allData.filter(item => {
           if (!item.date || item.type !== "支出") return false;
@@ -823,6 +894,46 @@
         },
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
       });
+    }
+
+    /* 編集モーダル制御 */
+    function openEditModal(rowIndex, cat, memo, amount) {
+      document.getElementById("editRowIndex").value = rowIndex;
+      document.getElementById("editCategory").value = cat;
+      document.getElementById("editMemo").value = memo;
+      document.getElementById("editAmount").value = amount;
+      document.getElementById("editModal").style.display = "flex";
+    }
+
+    function closeEditModal() {
+      document.getElementById("editModal").style.display = "none";
+    }
+
+    async function saveEdit() {
+      const rowIndex = document.getElementById("editRowIndex").value;
+      const cat = document.getElementById("editCategory").value;
+      const memo = document.getElementById("editMemo").value;
+      const amount = document.getElementById("editAmount").value;
+
+      closeEditModal();
+      document.getElementById("statusMessage").textContent = "更新中...";
+
+      try {
+        await fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "update",
+            rowIndex: Number(rowIndex),
+            category: cat,
+            memo: memo,
+            amount: amount
+          })
+        });
+        await loadData();
+      } catch (err) {
+        alert("更新に失敗しました");
+      }
     }
 
     async function addData() {
@@ -859,7 +970,6 @@
       }
     }
 
-    /* レシート解析 */
     async function handleReceiptUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -904,7 +1014,21 @@
         row.className = "input-row";
         row.style.marginBottom = "8px";
 
-        let catOptionsHtml = categoryOptions.map(c => `<option value="${c}">${c}</option>`).join('');
+        let catOptionsHtml = `
+          <optgroup label="共通（折半対象）">
+            <option value="共通：食料品">共通：食料品</option>
+            <option value="共通：日用品">共通：日用品</option>
+            <option value="共通：外食・カフェ">共通：外食・カフェ</option>
+            <option value="共通：消耗品">共通：消耗品</option>
+            <option value="共通：その他">共通：その他</option>
+          </optgroup>
+          <optgroup label="個人（折半なし）">
+            <option value="個人：食料品">個人：食料品</option>
+            <option value="個人：日用品">個人：日用品</option>
+            <option value="個人：娯楽・イベント">個人：娯楽・イベント</option>
+            <option value="個人：その他">個人：その他</option>
+          </optgroup>
+        `;
 
         row.innerHTML = `
           <input type="text" class="r-memo" value="${item.memo}" style="flex: 2; min-width: 100px;">
@@ -960,7 +1084,6 @@
       }
     }
 
-    /* 削除処理 */
     async function deleteData(rowIndex) {
       if (!confirm("この記録をスプレッドシートから完全に削除しますか？")) return;
 
