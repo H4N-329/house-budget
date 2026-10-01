@@ -9,12 +9,24 @@
     :root {
       --bg-color: #f6f5f0;
       --card-bg: #ffffff;
+      --text-dark: #333333;
+      --text-muted: #888888;
+      --border-color: #eee;
       --green-main: #3b7e5b;
       --orange-tag: #e08b47;
       --blue-tag: #6fa2b8;
-      --text-dark: #333333;
-      --text-muted: #888888;
       --border-radius: 16px;
+      --input-bg: #ffffff;
+    }
+
+    [data-theme="dark"] {
+      --bg-color: #121212;
+      --card-bg: #1e1e1e;
+      --text-dark: #e0e0e0;
+      --text-muted: #aaaaaa;
+      --border-color: #333333;
+      --green-main: #4d9e73;
+      --input-bg: #2a2a2a;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,6 +40,7 @@
       max-width: 480px;
       margin: 0 auto;
       width: 100%;
+      transition: background-color 0.3s, color 0.3s;
     }
 
     /* ヘッダー */
@@ -41,7 +54,7 @@
     .header-title { display: flex; align-items: center; gap: 6px; font-size: 18px; }
     .header-title span { color: var(--green-main); }
     .month-selector { display: flex; align-items: center; gap: 8px; font-size: 16px; }
-    .month-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: #666; padding: 0 4px; }
+    .month-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted); padding: 0 4px; }
 
     /* サマリーカード */
     .summary-card {
@@ -50,10 +63,23 @@
       border-radius: var(--border-radius);
       padding: 20px;
       margin-bottom: 16px;
+      position: relative;
     }
+    .summary-header { display: flex; justify-content: space-between; align-items: center; }
     .summary-title { font-size: 14px; opacity: 0.9; }
+    .settle-btn {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .settle-btn.done { background: #2e7d32; border-color: #a5d6a7; }
+
     .summary-amount { font-size: 30px; font-weight: bold; margin: 6px 0 12px; }
-    
     .badge-group { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
     .badge { background: rgba(255, 255, 255, 0.2); padding: 4px 10px; border-radius: 20px; font-size: 12px; }
     .badge-orange { background: var(--orange-tag); }
@@ -69,6 +95,10 @@
       line-height: 1.4;
     }
 
+    /* ビュー切り替え（ホーム / グラフ / 履歴 / 設定） */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
     /* カード */
     .card {
       background-color: var(--card-bg);
@@ -78,7 +108,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.03);
     }
     .card-title { font-size: 14px; color: var(--text-muted); font-weight: bold; margin-bottom: 12px; }
-    .empty-msg { font-size: 13px; color: #777; line-height: 1.5; }
+    .empty-msg { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 
     /* 履歴リスト */
     .record-list { list-style: none; }
@@ -87,11 +117,11 @@
       justify-content: space-between;
       align-items: center;
       padding: 10px 0;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 1px solid var(--border-color);
     }
     .record-item:last-child { border-bottom: none; }
     .record-main { display: flex; flex-direction: column; gap: 2px; }
-    .record-category { font-size: 11px; background: #eee; padding: 2px 6px; border-radius: 4px; display: inline-block; width: fit-content; }
+    .record-category { font-size: 11px; background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px; display: inline-block; width: fit-content; }
     .record-memo { font-size: 14px; font-weight: 500; }
     .record-sub { font-size: 11px; color: var(--text-muted); }
     .record-right { text-align: right; display: flex; align-items: center; gap: 8px; }
@@ -109,7 +139,7 @@
       font-weight: bold;
     }
 
-    /* 入力フォーム（固定バー・自動リサイズ修正版） */
+    /* 入力フォーム */
     .input-bar-container {
       position: fixed;
       bottom: 60px;
@@ -117,7 +147,7 @@
       transform: translateX(-50%);
       width: calc(100% - 24px);
       max-width: 456px;
-      background: white;
+      background: var(--card-bg);
       border-radius: 20px;
       padding: 12px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.12);
@@ -125,26 +155,23 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      border: 1px solid var(--border-color);
     }
-    .input-row {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      width: 100%;
-      flex-wrap: wrap;
-    }
+    .input-row { display: flex; gap: 6px; align-items: center; width: 100%; flex-wrap: wrap; }
     
     select, input[type="text"], input[type="number"], input[type="date"] {
-      border: 1px solid #ddd;
+      border: 1px solid var(--border-color);
+      background-color: var(--input-bg);
+      color: var(--text-dark);
       border-radius: 8px;
       padding: 8px;
       font-size: 13px;
       outline: none;
-      min-width: 0; /* Flexboxでの幅はみ出し防止 */
+      min-width: 0;
     }
 
     .input-date { flex: 2; min-width: 110px; }
-    .select-small { flex: 1.5; min-width: 100px; background: #f9f9f9; }
+    .select-small { flex: 1.5; min-width: 100px; }
     .input-memo { flex: 2; min-width: 110px; }
     .input-amount { flex: 1.5; min-width: 80px; font-weight: bold; }
 
@@ -157,7 +184,7 @@
       font-weight: bold;
       white-space: nowrap;
     }
-    .btn-type { background: #f0f0f0; color: #333; }
+    .btn-type { background: rgba(0,0,0,0.05); color: var(--text-dark); }
     .btn-user-me { background: var(--orange-tag); color: white; }
     .btn-user-partner { background: var(--blue-tag); color: white; }
 
@@ -190,37 +217,41 @@
       flex-shrink: 0;
     }
 
-    /* レシート モーダル */
+    /* モーダル汎用 */
     .modal-overlay {
       display: none;
       position: fixed;
       top:0; left:0; right:0; bottom:0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.6);
       z-index: 100;
       align-items: center;
       justify-content: center;
     }
     .modal-content {
-      background: white;
+      background: var(--card-bg);
+      color: var(--text-dark);
       border-radius: 16px;
       padding: 20px;
       width: 90%;
       max-width: 420px;
-      max-height: 80vh;
+      max-height: 85vh;
       overflow-y: auto;
     }
     .modal-title { font-size: 16px; font-weight: bold; margin-bottom: 12px; }
-    .receipt-item-row {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
     .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
     .modal-btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
-    .btn-cancel { background: #eee; }
+    .btn-cancel { background: #eee; color: #333; }
     .btn-save { background: var(--green-main); color: white; }
+
+    /* 設定項目スタイル */
+    .setting-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .setting-label { font-size: 14px; font-weight: 500; }
 
     /* ナビゲーションバー */
     .nav-bar {
@@ -230,11 +261,11 @@
       transform: translateX(-50%);
       width: 100%;
       max-width: 480px;
-      background: white;
+      background: var(--card-bg);
       display: flex;
       justify-content: space-around;
       padding: 10px 0;
-      border-top: 1px solid #eaeaea;
+      border-top: 1px solid var(--border-color);
       z-index: 5;
     }
     .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--text-muted); text-decoration: none; cursor: pointer; }
@@ -254,36 +285,84 @@
     </div>
   </div>
 
-  <!-- 収支サマリー -->
-  <div class="summary-card">
-    <div class="summary-title" id="summaryMonthTitle">今月の収支</div>
-    <div class="summary-amount" id="totalBalance">¥0</div>
-    <div class="badge-group">
-      <div class="badge" id="totalIncome">収入 ¥0</div>
-      <div class="badge" id="totalExpense">支出 ¥0</div>
+  <!-- 【タブ1】 ホーム画面 -->
+  <div id="tabHome" class="tab-content active">
+    <!-- 収支サマリー -->
+    <div class="summary-card">
+      <div class="summary-header">
+        <div class="summary-title" id="summaryMonthTitle">今月の収支</div>
+        <button id="settlementBtn" class="settle-btn" onclick="toggleSettlement()">未精算</button>
+      </div>
+      <div class="summary-amount" id="totalBalance">¥0</div>
+      <div class="badge-group">
+        <div class="badge" id="totalIncome">収入 ¥0</div>
+        <div class="badge" id="totalExpense">支出 ¥0</div>
+      </div>
+      <div class="badge-group">
+        <div class="badge badge-orange" id="myExpense">ゆうきの支出 ¥0</div>
+        <div class="badge badge-blue" id="partnerExpense">れなの支出 ¥0</div>
+      </div>
+      <div class="split-info" id="splitResult">精算計算中...</div>
     </div>
-    <div class="badge-group">
-      <div class="badge badge-orange" id="myExpense">ゆうきの支出 ¥0</div>
-      <div class="badge badge-blue" id="partnerExpense">れなの支出 ¥0</div>
+
+    <!-- カテゴリ別支出グラフ -->
+    <div class="card">
+      <div class="card-title">カテゴリ別支出</div>
+      <canvas id="categoryChart" style="max-height: 200px;"></canvas>
     </div>
-    <div class="split-info" id="splitResult">精算計算中...</div>
+
+    <!-- 最近の記録 -->
+    <div class="card">
+      <div class="card-title">最近の記録</div>
+      <div id="statusMessage" class="empty-msg"></div>
+      <ul id="dataList" class="record-list"></ul>
+    </div>
   </div>
 
-  <!-- 支出内訳グラフ -->
-  <div class="card">
-    <div class="card-title">カテゴリ別支出グラフ</div>
-    <canvas id="categoryChart" style="max-height: 220px;"></canvas>
+  <!-- 【タブ2】 グラフ・分析画面 -->
+  <div id="tabAnalytics" class="tab-content">
+    <div class="card">
+      <div class="card-title">個人支出 vs 共通支出（今月）</div>
+      <canvas id="personalVsSharedChart" style="max-height: 200px;"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">先月との支出比較</div>
+      <canvas id="monthCompareChart" style="max-height: 220px;"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">過去数ヶ月の支出傾向</div>
+      <canvas id="trendChart" style="max-height: 220px;"></canvas>
+    </div>
   </div>
 
-  <!-- 最近の記録 -->
-  <div class="card">
-    <div class="card-title">最近の記録</div>
-    <div id="statusMessage" class="empty-msg"></div>
-    <ul id="dataList" class="record-list"></ul>
+  <!-- 【タブ3】 履歴画面 -->
+  <div id="tabHistory" class="tab-content">
+    <div class="card">
+      <div class="card-title">月間全履歴</div>
+      <ul id="fullHistoryList" class="record-list"></ul>
+    </div>
   </div>
 
-  <!-- 入力フォーム -->
-  <div class="input-bar-container">
+  <!-- 【タブ4】 設定画面 -->
+  <div id="tabSettings" class="tab-content">
+    <div class="card">
+      <div class="card-title">アプリ設定</div>
+      <div class="setting-item">
+        <span class="setting-label">ダークモード</span>
+        <input type="checkbox" id="themeToggle" onchange="toggleTheme(this.checked)">
+      </div>
+      <div class="setting-item">
+        <span class="setting-label">初回チュートリアルを表示</span>
+        <input type="checkbox" id="tutorialToggle" onchange="toggleTutorialSetting(this.checked)">
+      </div>
+      <div class="setting-item" style="border:none; margin-top: 10px;">
+        <button class="modal-btn btn-save" style="width:100%;" onclick="startTutorial()">チュートリアルを今すぐ見る</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 固定入力フォーム（ホーム・履歴時のみ表示） -->
+  <div class="input-bar-container" id="inputBar">
     <div class="input-row">
       <button class="toggle-btn btn-type" id="btnType" onclick="toggleType()">支出</button>
       <button class="toggle-btn btn-user-me" id="btnUser" onclick="toggleUser()">ゆうき</button>
@@ -313,7 +392,19 @@
     </div>
   </div>
 
-  <!-- レシート読み取り確認モーダル -->
+  <!-- チュートリアル モーダル -->
+  <div class="modal-overlay" id="tutorialModal">
+    <div class="modal-content">
+      <div class="modal-title" id="tutTitle">チュートリアル (1/3)</div>
+      <div id="tutBody" style="font-size: 14px; line-height: 1.6; margin: 12px 0;"></div>
+      <div class="modal-actions">
+        <button class="modal-btn btn-cancel" onclick="closeTutorial()">スキップ</button>
+        <button class="modal-btn btn-save" id="tutNextBtn" onclick="nextTutorialStep()">次へ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- レシート確認 モーダル -->
   <div class="modal-overlay" id="receiptModal">
     <div class="modal-content">
       <div class="modal-title">レシート項目の確認・カテゴリ振り分け</div>
@@ -327,10 +418,10 @@
 
   <!-- 下部ナビゲーション -->
   <div class="nav-bar">
-    <div class="nav-item active"><span class="nav-icon">🏠</span>ホーム</div>
-    <div class="nav-item"><span class="nav-icon">📊</span>グラフ</div>
-    <div class="nav-item"><span class="nav-icon">📋</span>履歴</div>
-    <div class="nav-item"><span class="nav-icon">⚙</span>設定</div>
+    <div class="nav-item active" onclick="switchTab('tabHome', this)"><span class="nav-icon">🏠</span>ホーム</div>
+    <div class="nav-item" onclick="switchTab('tabAnalytics', this)"><span class="nav-icon">📊</span>グラフ</div>
+    <div class="nav-item" onclick="switchTab('tabHistory', this)"><span class="nav-icon">📋</span>履歴</div>
+    <div class="nav-item" onclick="switchTab('tabSettings', this)"><span class="nav-icon">⚙</span>設定</div>
   </div>
 
   <script>
@@ -340,7 +431,19 @@
     let currentType = "支出";
     let currentUser = "ゆうき";
     let allData = [];
-    let myChart = null;
+    
+    // Chart インスタンス
+    let chartHome = null;
+    let chartPersonalShared = null;
+    let chartMonthCompare = null;
+    let chartTrend = null;
+
+    let tutorialStep = 0;
+    const tutorialSteps = [
+      { title: "ふたり家計簿へようこそ！ (1/3)", text: "画面下の入力バーから、日付・メンバー（ゆうき/れな）・カテゴリ・金額を入力して「＋」を押すと、すぐに共有スプレッドシートに反映されます。" },
+      { title: "カメラでレシート撮影 (2/3)", text: "「📷 撮影」ボタンを押すとレシート画像から金額や項目を自動解析できます。まとめて簡単に登録が可能です。" },
+      { title: "自動で立替精算を計算 (3/3)", text: "入力された支出をもとに、今月どちらがいくら相手に支払えばよいかを自動算出します。精算が終わったら「未精算」ボタンを押して「精算済み」に記録しましょう！" }
+    ];
 
     const categoryOptions = [
       "食料品", "日用品", "外食・カフェ", "光熱費・住居",
@@ -350,28 +453,141 @@
 
     window.onload = () => {
       document.getElementById("inputDate").valueAsDate = new Date();
+      
+      // 設定の読み込み
+      initSettings();
+
       updateMonthDisplay();
       loadData();
     };
+
+    /* 設定・テーマの読み込み */
+    function initSettings() {
+      const isDark = localStorage.getItem("theme_dark") === "true";
+      document.getElementById("themeToggle").checked = isDark;
+      toggleTheme(isDark);
+
+      const tutEnabled = localStorage.getItem("tutorial_enabled") !== "false";
+      document.getElementById("tutorialToggle").checked = tutEnabled;
+
+      if (tutEnabled && !localStorage.getItem("tutorial_seen")) {
+        startTutorial();
+      }
+    }
+
+    function toggleTheme(isDark) {
+      if (isDark) {
+        document.body.setAttribute("data-theme", "dark");
+        localStorage.setItem("theme_dark", "true");
+      } else {
+        document.body.removeAttribute("data-theme");
+        localStorage.setItem("theme_dark", "false");
+      }
+    }
+
+    function toggleTutorialSetting(enabled) {
+      localStorage.setItem("tutorial_enabled", enabled ? "true" : "false");
+    }
+
+    /* チュートリアル表示制御 */
+    function startTutorial() {
+      tutorialStep = 0;
+      updateTutorialModal();
+      document.getElementById("tutorialModal").style.display = "flex";
+    }
+
+    function updateTutorialModal() {
+      const data = tutorialSteps[tutorialStep];
+      document.getElementById("tutTitle").textContent = data.title;
+      document.getElementById("tutBody").textContent = data.text;
+      document.getElementById("tutNextBtn").textContent = tutorialStep === tutorialSteps.length - 1 ? "完了" : "次へ";
+    }
+
+    function nextTutorialStep() {
+      tutorialStep++;
+      if (tutorialStep >= tutorialSteps.length) {
+        closeTutorial();
+      } else {
+        updateTutorialModal();
+      }
+    }
+
+    function closeTutorial() {
+      localStorage.setItem("tutorial_seen", "true");
+      document.getElementById("tutorialModal").style.display = "none";
+    }
+
+    /* 精算トグルボタン */
+    function getSettlementKey() {
+      return `settle_${currentDate.getFullYear()}_${currentDate.getMonth() + 1}`;
+    }
+
+    function updateSettlementBtnDisplay() {
+      const btn = document.getElementById("settlementBtn");
+      const isDone = localStorage.getItem(getSettlementKey()) === "done";
+      if (isDone) {
+        btn.textContent = "精算済み ✓";
+        btn.classList.add("done");
+      } else {
+        btn.textContent = "未精算";
+        btn.classList.remove("done");
+      }
+    }
+
+    function toggleSettlement() {
+      const key = getSettlementKey();
+      const current = localStorage.getItem(key);
+      if (current === "done") {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, "done");
+      }
+      updateSettlementBtnDisplay();
+    }
+
+    /* タブ切り替え */
+    function switchTab(tabId, elem) {
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+      document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+      
+      document.getElementById(tabId).classList.add("active");
+      elem.classList.add("active");
+
+      // 入力バーは「設定」タブ以外で表示
+      const inputBar = document.getElementById("inputBar");
+      if (tabId === "tabSettings") {
+        inputBar.style.display = "none";
+      } else {
+        inputBar.style.display = "flex";
+      }
+
+      if (tabId === "tabAnalytics") {
+        renderAnalytics();
+      }
+    }
 
     function updateMonthDisplay() {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
       document.getElementById("currentMonthText").textContent = `${year}年${month}月`;
       document.getElementById("summaryMonthTitle").textContent = `${month}月の収支`;
+      updateSettlementBtnDisplay();
     }
 
     function changeMonth(delta) {
       currentDate.setMonth(currentDate.getMonth() + delta);
       updateMonthDisplay();
       renderUI();
+      if (document.getElementById("tabAnalytics").classList.contains("active")) {
+        renderAnalytics();
+      }
     }
 
     function toggleType() {
       currentType = currentType === "支出" ? "収入" : "支出";
       const btn = document.getElementById("btnType");
       btn.textContent = currentType;
-      btn.style.background = currentType === "収入" ? "#e8f5e9" : "#f0f0f0";
+      btn.style.background = currentType === "収入" ? "#e8f5e9" : "rgba(0,0,0,0.05)";
     }
 
     function toggleUser() {
@@ -398,8 +614,11 @@
 
     function renderUI() {
       const listElement = document.getElementById("dataList");
+      const fullListElement = document.getElementById("fullHistoryList");
       const statusElement = document.getElementById("statusMessage");
+      
       listElement.innerHTML = "";
+      fullListElement.innerHTML = "";
 
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -419,14 +638,12 @@
       let incTotal = 0, expTotal = 0;
       let myTotalExp = 0, partnerTotalExp = 0;
 
-      let yukiSharedTarget = 0;
-      let renaSharedTarget = 0;
-      let yukiPaidShared = 0;
-      let renaPaidShared = 0;
+      let yukiSharedTarget = 0, renaSharedTarget = 0;
+      let yukiPaidShared = 0, renaPaidShared = 0;
 
       let categoryTotals = {};
 
-      filtered.reverse().forEach(item => {
+      filtered.slice().reverse().forEach(item => {
         const amt = Number(item.amount) || 0;
         const isExp = item.type === "支出";
         const cat = item.category || "未分類";
@@ -435,11 +652,8 @@
           expTotal += amt;
           categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
 
-          if (item.user === "れな") {
-            partnerTotalExp += amt;
-          } else {
-            myTotalExp += amt;
-          }
+          if (item.user === "れな") partnerTotalExp += amt;
+          else myTotalExp += amt;
 
           if (cat === "個人利用") {
             // 個人利用は折半対象外
@@ -474,6 +688,7 @@
           </div>
         `;
         listElement.appendChild(li);
+        fullListElement.appendChild(li.cloneNode(true));
       });
 
       document.getElementById("totalBalance").textContent = `¥${(incTotal - expTotal).toLocaleString()}`;
@@ -493,18 +708,18 @@
         splitElem.innerHTML = `精算結果 (共有分)<br>ゆうき ➔ れな: <b>¥${Math.round(Math.abs(yukiDiff)).toLocaleString()}</b> 支払い`;
       }
 
-      renderChart(categoryTotals);
+      renderHomeChart(categoryTotals);
     }
 
-    function renderChart(categoryTotals) {
+    function renderHomeChart(categoryTotals) {
       const ctx = document.getElementById('categoryChart').getContext('2d');
       const labels = Object.keys(categoryTotals);
       const data = Object.values(categoryTotals);
 
-      if (myChart) myChart.destroy();
+      if (chartHome) chartHome.destroy();
       if (labels.length === 0) return;
 
-      myChart = new Chart(ctx, {
+      chartHome = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels: labels,
@@ -515,8 +730,98 @@
         },
         options: {
           responsive: true,
-          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+          plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, color: getComputedStyle(document.body).getPropertyValue('--text-dark') } } }
         }
+      });
+    }
+
+    /* 分析タブのグラフ群描画 */
+    function renderAnalytics() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      const currentFiltered = allData.filter(item => {
+        if (!item.date || item.type !== "支出") return false;
+        const d = new Date(item.date);
+        return d.getFullYear() === year && d.getMonth() === month;
+      });
+
+      // 1. 個人 vs 共通 グラフ
+      let yukiPersonal = 0, renaPersonal = 0, sharedTotal = 0;
+      currentFiltered.forEach(i => {
+        const amt = Number(i.amount) || 0;
+        if (i.category === "個人利用") {
+          if (i.user === "れな") renaPersonal += amt;
+          else yukiPersonal += amt;
+        } else {
+          sharedTotal += amt;
+        }
+      });
+
+      const ctxPS = document.getElementById('personalVsSharedChart').getContext('2d');
+      if (chartPersonalShared) chartPersonalShared.destroy();
+      chartPersonalShared = new Chart(ctxPS, {
+        type: 'pie',
+        data: {
+          labels: ['共通支出', 'ゆうき個人', 'れな個人'],
+          datasets: [{ data: [sharedTotal, yukiPersonal, renaPersonal], backgroundColor: ['#3b7e5b', '#e08b47', '#6fa2b8'] }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      // 2. 先月との比較 グラフ
+      const prevDate = new Date(year, month - 1, 1);
+      const prevFiltered = allData.filter(item => {
+        if (!item.date || item.type !== "支出") return false;
+        const d = new Date(item.date);
+        return d.getFullYear() === prevDate.getFullYear() && d.getMonth() === prevDate.getMonth();
+      });
+
+      const curCat = {}, prevCat = {};
+      currentFiltered.forEach(i => curCat[i.category] = (curCat[i.category] || 0) + (Number(i.amount) || 0));
+      prevFiltered.forEach(i => prevCat[i.category] = (prevCat[i.category] || 0) + (Number(i.amount) || 0));
+
+      const allCats = Array.from(new Set([...Object.keys(curCat), ...Object.keys(prevCat)]));
+      const ctxMC = document.getElementById('monthCompareChart').getContext('2d');
+      if (chartMonthCompare) chartMonthCompare.destroy();
+      chartMonthCompare = new Chart(ctxMC, {
+        type: 'bar',
+        data: {
+          labels: allCats,
+          datasets: [
+            { label: '先月', data: allCats.map(c => prevCat[c] || 0), backgroundColor: '#ccc' },
+            { label: '今月', data: allCats.map(c => curCat[c] || 0), backgroundColor: '#3b7e5b' }
+          ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      // 3. 過去6ヶ月の推移 グラフ
+      const trendLabels = [];
+      const trendData = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(year, month - i, 1);
+        const label = `${d.getMonth() + 1}月`;
+        trendLabels.push(label);
+
+        const mExp = allData.filter(item => {
+          if (!item.date || item.type !== "支出") return false;
+          const itemD = new Date(item.date);
+          return itemD.getFullYear() === d.getFullYear() && itemD.getMonth() === d.getMonth();
+        }).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
+        trendData.push(mExp);
+      }
+
+      const ctxTrend = document.getElementById('trendChart').getContext('2d');
+      if (chartTrend) chartTrend.destroy();
+      chartTrend = new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+          labels: trendLabels,
+          datasets: [{ label: '月別総支出', data: trendData, borderColor: '#e08b47', backgroundColor: 'rgba(224,139,71,0.1)', fill: true }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
       });
     }
 
@@ -554,7 +859,7 @@
       }
     }
 
-    /* レシート読み取り処理 */
+    /* レシート解析 */
     async function handleReceiptUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -594,9 +899,10 @@
       const container = document.getElementById("receiptItemsContainer");
       container.innerHTML = "";
 
-      items.forEach((item, index) => {
+      items.forEach((item) => {
         const row = document.createElement("div");
-        row.className = "receipt-item-row";
+        row.className = "input-row";
+        row.style.marginBottom = "8px";
 
         let catOptionsHtml = categoryOptions.map(c => `<option value="${c}">${c}</option>`).join('');
 
@@ -616,7 +922,7 @@
     }
 
     async function saveReceiptItems() {
-      const rows = document.querySelectorAll(".receipt-item-row");
+      const rows = document.querySelectorAll("#receiptItemsContainer .input-row");
       const date = document.getElementById("inputDate").value;
       let records = [];
 
@@ -654,7 +960,7 @@
       }
     }
 
-    /* 完全削除処理 */
+    /* 削除処理 */
     async function deleteData(rowIndex) {
       if (!confirm("この記録をスプレッドシートから完全に削除しますか？")) return;
 
