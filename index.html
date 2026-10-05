@@ -95,7 +95,7 @@
       line-height: 1.4;
     }
 
-    /* ビュー切り替え */
+    /* タブコンテンツ */
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -228,6 +228,66 @@
       flex-shrink: 0;
     }
 
+    /* 人物切り替えスイッチ（個別タブ用） */
+    .user-switch-container {
+      display: flex;
+      background: rgba(0,0,0,0.06);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 14px;
+    }
+    .user-switch-btn {
+      flex: 1;
+      padding: 8px 0;
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .user-switch-btn.active-yuki {
+      background: var(--orange-tag);
+      color: white;
+    }
+    .user-switch-btn.active-rena {
+      background: var(--blue-tag);
+      color: white;
+    }
+
+    /* 比較進捗リスト */
+    .budget-compare-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .budget-compare-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+    }
+    .budget-compare-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 500;
+    }
+    .progress-bar-bg {
+      height: 8px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--green-main);
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+    .progress-bar-fill.over { background: #d32f2f; }
+
     /* モーダル */
     .modal-overlay {
       display: none;
@@ -263,6 +323,25 @@
     }
     .setting-label { font-size: 14px; font-weight: 500; }
 
+    /* 目標額入力アコーディオン */
+    .budget-input-group {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .budget-input-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .budget-input-row input {
+      width: 110px;
+      text-align: right;
+    }
+
     /* ナビゲーションバー */
     .nav-bar {
       position: fixed;
@@ -274,13 +353,13 @@
       background: var(--card-bg);
       display: flex;
       justify-content: space-around;
-      padding: 10px 0;
+      padding: 8px 0;
       border-top: 1px solid var(--border-color);
       z-index: 5;
     }
-    .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--text-muted); text-decoration: none; cursor: pointer; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 9px; color: var(--text-muted); text-decoration: none; cursor: pointer; }
     .nav-item.active { color: var(--green-main); font-weight: bold; }
-    .nav-icon { font-size: 18px; margin-bottom: 2px; }
+    .nav-icon { font-size: 17px; margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -332,6 +411,10 @@
   <!-- 【タブ2】 グラフ・分析画面 -->
   <div id="tabAnalytics" class="tab-content">
     <div class="card">
+      <div class="card-title">共通の目標 (予算/貯金) vs 実績</div>
+      <canvas id="sharedBudgetCompareChart" style="max-height: 220px;"></canvas>
+    </div>
+    <div class="card">
       <div class="card-title">個人支出 vs 共通支出（今月）</div>
       <canvas id="personalVsSharedChart" style="max-height: 200px;"></canvas>
     </div>
@@ -345,7 +428,26 @@
     </div>
   </div>
 
-  <!-- 【タブ3】 履歴画面 -->
+  <!-- 【タブ3】 個別画面 (新規) -->
+  <div id="tabIndividual" class="tab-content">
+    <div class="user-switch-container">
+      <button id="btnSwitchYuki" class="user-switch-btn active-yuki" onclick="switchIndivUser('ゆうき')">ゆうき</button>
+      <button id="btnSwitchRena" class="user-switch-btn" onclick="switchIndivUser('れな')">れな</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title" id="indivChartTitle">ゆうきの支出・貯金 内訳</div>
+      <canvas id="indivCategoryChart" style="max-height: 240px;"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-title" id="indivCompareTitle">目標 vs 実際の支出・貯金</div>
+      <canvas id="indivBudgetChart" style="max-height: 220px; margin-bottom: 12px;"></canvas>
+      <div id="indivBudgetProgressList" class="budget-compare-list"></div>
+    </div>
+  </div>
+
+  <!-- 【タブ4】 履歴画面 -->
   <div id="tabHistory" class="tab-content">
     <div class="card">
       <div class="card-title">月間全履歴</div>
@@ -353,7 +455,7 @@
     </div>
   </div>
 
-  <!-- 【タブ4】 設定画面 -->
+  <!-- 【タブ5】 設定画面 -->
   <div id="tabSettings" class="tab-content">
     <div class="card">
       <div class="card-title">アプリ設定</div>
@@ -365,9 +467,25 @@
         <span class="setting-label">初回チュートリアルを表示</span>
         <input type="checkbox" id="tutorialToggle" onchange="toggleTutorialSetting(this.checked)">
       </div>
-      <div class="setting-item" style="border:none; margin-top: 10px;">
+      <div class="setting-item" style="border:none; margin-top: 6px;">
         <button class="modal-btn btn-save" style="width:100%;" onclick="startTutorial()">チュートリアルを今すぐ見る</button>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">月間目標額・貯金目標の設定</div>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">各カテゴリの月間目標額（予算・貯金目標）を設定できます。</p>
+      
+      <div style="font-weight:bold; font-size:13px; color:var(--green-main); margin-bottom:6px;">■ 共通カテゴリ目標</div>
+      <div id="budgetInputsShared" class="budget-input-group"></div>
+
+      <div style="font-weight:bold; font-size:13px; color:var(--orange-tag); margin-top:14px; margin-bottom:6px;">■ ゆうき個人目標</div>
+      <div id="budgetInputsYuki" class="budget-input-group"></div>
+
+      <div style="font-weight:bold; font-size:13px; color:var(--blue-tag); margin-top:14px; margin-bottom:6px;">■ れな個人目標</div>
+      <div id="budgetInputsRena" class="budget-input-group"></div>
+
+      <button class="modal-btn btn-save" style="width:100%; margin-top:16px;" onclick="saveBudgetsFromSettings()">目標額を保存する</button>
     </div>
   </div>
 
@@ -390,10 +508,12 @@
           <option value="共通：家賃">共通：家賃 (ゆうき6:れな4)</option>
           <option value="共通：光熱費・住居">共通：光熱費・住居</option>
           <option value="共通：外食・カフェ">共通：外食・カフェ</option>
+          <option value="共通：家具・家電">共通：家具・家電</option>
           <option value="共通：消耗品">共通：消耗品</option>
           <option value="共通：サブスク・通信">共通：サブスク・通信</option>
           <option value="共通：交通費">共通：交通費</option>
           <option value="共通：娯楽・イベント">共通：娯楽・イベント</option>
+          <option value="共通：貯金">共通：貯金</option>
           <option value="共通：その他">共通：その他</option>
         </optgroup>
         <optgroup label="個人（折半なし）">
@@ -401,9 +521,12 @@
           <option value="個人：日用品">個人：日用品</option>
           <option value="個人：外食・カフェ">個人：外食・カフェ</option>
           <option value="個人：衣服・美容">個人：衣服・美容</option>
+          <option value="個人：家具・家電">個人：家具・家電</option>
+          <option value="個人：消耗品">個人：消耗品</option>
           <option value="個人：サブスク・通信">個人：サブスク・通信</option>
           <option value="個人：交通費">個人：交通費</option>
           <option value="個人：娯楽・イベント">個人：娯楽・イベント</option>
+          <option value="個人：貯金">個人：貯金</option>
           <option value="個人：その他">個人：その他</option>
         </optgroup>
       </select>
@@ -427,10 +550,12 @@
             <option value="共通：家賃">共通：家賃 (ゆうき6:れな4)</option>
             <option value="共通：光熱費・住居">共通：光熱費・住居</option>
             <option value="共通：外食・カフェ">共通：外食・カフェ</option>
+            <option value="共通：家具・家電">共通：家具・家電</option>
             <option value="共通：消耗品">共通：消耗品</option>
             <option value="共通：サブスク・通信">共通：サブスク・通信</option>
             <option value="共通：交通費">共通：交通費</option>
             <option value="共通：娯楽・イベント">共通：娯楽・イベント</option>
+            <option value="共通：貯金">共通：貯金</option>
             <option value="共通：その他">共通：その他</option>
           </optgroup>
           <optgroup label="個人（折半なし）">
@@ -438,9 +563,12 @@
             <option value="個人：日用品">個人：日用品</option>
             <option value="個人：外食・カフェ">個人：外食・カフェ</option>
             <option value="個人：衣服・美容">個人：衣服・美容</option>
+            <option value="個人：家具・家電">個人：家具・家電</option>
+            <option value="個人：消耗品">個人：消耗品</option>
             <option value="個人：サブスク・通信">個人：サブスク・通信</option>
             <option value="個人：交通費">個人：交通費</option>
             <option value="個人：娯楽・イベント">個人：娯楽・イベント</option>
+            <option value="個人：貯金">個人：貯金</option>
             <option value="個人：その他">個人：その他</option>
           </optgroup>
         </select>
@@ -484,6 +612,7 @@
   <div class="nav-bar">
     <div class="nav-item active" onclick="switchTab('tabHome', this)"><span class="nav-icon">🏠</span>ホーム</div>
     <div class="nav-item" onclick="switchTab('tabAnalytics', this)"><span class="nav-icon">📊</span>グラフ</div>
+    <div class="nav-item" onclick="switchTab('tabIndividual', this)"><span class="nav-icon">👤</span>個別</div>
     <div class="nav-item" onclick="switchTab('tabHistory', this)"><span class="nav-icon">📋</span>履歴</div>
     <div class="nav-item" onclick="switchTab('tabSettings', this)"><span class="nav-icon">⚙</span>設定</div>
   </div>
@@ -494,36 +623,45 @@
     let currentDate = new Date();
     let currentType = "支出";
     let currentUser = "ゆうき";
+    let selectedIndivUser = "ゆうき";
     let allData = [];
     
+    // Charts
     let chartHome = null;
     let chartPersonalShared = null;
     let chartMonthCompare = null;
     let chartTrend = null;
+    let chartSharedBudgetCompare = null;
+    let chartIndivCategory = null;
+    let chartIndivBudget = null;
 
     let tutorialStep = 0;
     const tutorialSteps = [
       { title: "ふたり家計簿へようこそ！ (1/3)", text: "画面下の入力バーから、共通・個人のカテゴリや金額を選んで「＋」を押すと、共有スプレッドシートに反映されます。" },
       { title: "カメラでレシート撮影 (2/3)", text: "「📷 撮影」ボタンを押すとレシート画像から金額や項目を自動解析できます。まとめて登録が可能です。" },
-      { title: "自動で立替精算を計算 (3/3)", text: "共通の支出のみを対象に自動算出します。精算が終わったら「未精算」ボタンを押して「精算済み」に記録しましょう！" }
+      { title: "自動で立替精算を計算 (3/3)", text: "共通の支出のみを対象に自動算出します。「👤 個別」タブでは目標額（予算・貯金）との比較グラフも確認できます！" }
     ];
 
-    const categoryOptionsList = [
+    const sharedCategories = [
       "共通：食料品", "共通：日用品", "共通：家賃 (ゆうき6:れな4)", "共通：光熱費・住居",
-      "共通：外食・カフェ", "共通：消耗品", "共通：サブスク・通信", "共通：交通費",
-      "共通：娯楽・イベント", "共通：その他",
+      "共通：外食・カフェ", "共通：家具・家電", "共通：消耗品", "共通：サブスク・通信",
+      "共通：交通費", "共通：娯楽・イベント", "共通：貯金", "共通：その他"
+    ];
+
+    const personalCategories = [
       "個人：食料品", "個人：日用品", "個人：外食・カフェ", "個人：衣服・美容",
-      "個人：サブスク・通信", "個人：交通費", "個人：娯楽・イベント", "個人：その他"
+      "個人：家具・家電", "個人：消耗品", "個人：サブスク・通信", "個人：交通費",
+      "個人：娯楽・イベント", "個人：貯金", "個人：その他"
     ];
 
     window.onload = () => {
       document.getElementById("inputDate").valueAsDate = new Date();
       initSettings();
+      renderBudgetSettingInputs();
       updateMonthDisplay();
       loadData();
     };
 
-    /* カテゴリ正規化（過去の「個人利用」や旧名称を「個人：娯楽・イベント」等に変換） */
     function normalizeCategory(cat) {
       if (!cat) return "共通：その他";
       if (cat === "個人利用") return "個人：娯楽・イベント";
@@ -588,6 +726,53 @@
       document.getElementById("tutorialModal").style.display = "none";
     }
 
+    /* 目標額（予算/貯金）データの取得・保存 */
+    function getStoredBudgets() {
+      return JSON.parse(localStorage.getItem("app_budgets") || "{}");
+    }
+
+    function renderBudgetSettingInputs() {
+      const budgets = getStoredBudgets();
+
+      const renderGroup = (containerId, cats, keyPrefix) => {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+        cats.forEach(c => {
+          const val = budgets[`${keyPrefix}_${c}`] || 0;
+          const row = document.createElement("div");
+          row.className = "budget-input-row";
+          row.innerHTML = `
+            <span>${c}</span>
+            <input type="number" data-key="${keyPrefix}_${c}" value="${val}" placeholder="0">
+          `;
+          container.appendChild(row);
+        });
+      };
+
+      renderGroup("budgetInputsShared", sharedCategories, "shared");
+      renderGroup("budgetInputsYuki", personalCategories, "yuki");
+      renderGroup("budgetInputsRena", personalCategories, "rena");
+    }
+
+    function saveBudgetsFromSettings() {
+      const budgets = {};
+      document.querySelectorAll(".budget-input-row input").forEach(input => {
+        const key = input.getAttribute("data-key");
+        const val = Number(input.value) || 0;
+        if (val > 0) budgets[key] = val;
+      });
+      localStorage.setItem("app_budgets", JSON.stringify(budgets));
+      alert("目標額（予算・貯金）を保存しました");
+      
+      if (document.getElementById("tabIndividual").classList.contains("active")) {
+        renderIndividualView();
+      }
+      if (document.getElementById("tabAnalytics").classList.contains("active")) {
+        renderAnalytics();
+      }
+    }
+
+    /* 精算トグルボタン */
     function getSettlementKey() {
       return `settle_${currentDate.getFullYear()}_${currentDate.getMonth() + 1}`;
     }
@@ -615,6 +800,7 @@
       updateSettlementBtnDisplay();
     }
 
+    /* タブ切り替え */
     function switchTab(tabId, elem) {
       document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
       document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
@@ -629,9 +815,23 @@
         inputBar.style.display = "flex";
       }
 
-      if (tabId === "tabAnalytics") {
-        renderAnalytics();
+      if (tabId === "tabAnalytics") renderAnalytics();
+      if (tabId === "tabIndividual") renderIndividualView();
+    }
+
+    function switchIndivUser(user) {
+      selectedIndivUser = user;
+      const btnYuki = document.getElementById("btnSwitchYuki");
+      const btnRena = document.getElementById("btnSwitchRena");
+
+      if (user === "ゆうき") {
+        btnYuki.className = "user-switch-btn active-yuki";
+        btnRena.className = "user-switch-btn";
+      } else {
+        btnYuki.className = "user-switch-btn";
+        btnRena.className = "user-switch-btn active-rena";
       }
+      renderIndividualView();
     }
 
     function updateMonthDisplay() {
@@ -646,9 +846,8 @@
       currentDate.setMonth(currentDate.getMonth() + delta);
       updateMonthDisplay();
       renderUI();
-      if (document.getElementById("tabAnalytics").classList.contains("active")) {
-        renderAnalytics();
-      }
+      if (document.getElementById("tabAnalytics").classList.contains("active")) renderAnalytics();
+      if (document.getElementById("tabIndividual").classList.contains("active")) renderIndividualView();
     }
 
     function toggleType() {
@@ -723,7 +922,6 @@
           if (item.user === "れな") partnerTotalExp += amt;
           else myTotalExp += amt;
 
-          // 共通項目のみ折半対象とする
           if (cat.startsWith("共通：")) {
             if (cat.includes("家賃")) {
               yukiSharedTarget += amt * 0.6;
@@ -804,6 +1002,120 @@
       });
     }
 
+    /* 【個別タブ】レンダリング（棒グラフ＋目標比較） */
+    function renderIndividualView() {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      document.getElementById("indivChartTitle").textContent = `${selectedIndivUser}の月間支出・貯金内訳`;
+      document.getElementById("indivCompareTitle").textContent = `${selectedIndivUser}の目標 vs 実際`;
+
+      // 該当ユーザーの当月データを抽出
+      const userFiltered = allData.filter(item => {
+        if (!item.date || item.type !== "支出") return false;
+        const d = new Date(item.date);
+        return d.getFullYear() === year && d.getMonth() === month && item.user === selectedIndivUser;
+      });
+
+      const catActuals = {};
+      userFiltered.forEach(i => {
+        const cat = normalizeCategory(i.category);
+        catActuals[cat] = (catActuals[cat] || 0) + (Number(i.amount) || 0);
+      });
+
+      // 1. 棒グラフ（内訳）
+      const labels = Object.keys(catActuals);
+      const dataVals = Object.values(catActuals);
+
+      const ctxCat = document.getElementById('indivCategoryChart').getContext('2d');
+      if (chartIndivCategory) chartIndivCategory.destroy();
+
+      chartIndivCategory = new Chart(ctxCat, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '支出・貯金額 (円)',
+            data: dataVals,
+            backgroundColor: selectedIndivUser === 'ゆうき' ? '#e08b47' : '#6fa2b8'
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 2. 目標 vs 実際の比較グラフ ＆ 進捗リスト
+      const budgets = getStoredBudgets();
+      const prefix = selectedIndivUser === 'ゆうき' ? 'yuki' : 'rena';
+      
+      const compareLabels = [];
+      const budgetVals = [];
+      const actualVals = [];
+
+      personalCategories.forEach(c => {
+        const b = budgets[`${prefix}_${c}`] || 0;
+        const a = catActuals[c] || 0;
+        if (b > 0 || a > 0) {
+          compareLabels.push(c.replace("個人：", ""));
+          budgetVals.push(b);
+          actualVals.push(a);
+        }
+      });
+
+      const ctxB = document.getElementById('indivBudgetChart').getContext('2d');
+      if (chartIndivBudget) chartIndivBudget.destroy();
+
+      chartIndivBudget = new Chart(ctxB, {
+        type: 'bar',
+        data: {
+          labels: compareLabels,
+          datasets: [
+            { label: '目標額', data: budgetVals, backgroundColor: '#ccc' },
+            { label: '実際', data: actualVals, backgroundColor: selectedIndivUser === 'ゆうき' ? '#e08b47' : '#6fa2b8' }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+
+      // 進捗バーリストの更新
+      const progressContainer = document.getElementById("indivBudgetProgressList");
+      progressContainer.innerHTML = "";
+
+      if (compareLabels.length === 0) {
+        progressContainer.innerHTML = `<div style="font-size:12px; color:var(--text-muted);">設定タブから目標額を設定すると、比較が表示されます。</div>`;
+        return;
+      }
+
+      compareLabels.forEach((lbl, idx) => {
+        const target = budgetVals[idx];
+        const actual = actualVals[idx];
+        const isSavings = lbl.includes("貯金");
+        
+        let percent = target > 0 ? Math.min(Math.round((actual / target) * 100), 100) : 0;
+        const isOver = !isSavings && target > 0 && actual > target;
+
+        const item = document.createElement("div");
+        item.className = "budget-compare-item";
+        item.innerHTML = `
+          <div class="budget-compare-header">
+            <span>${lbl}</span>
+            <span>¥${actual.toLocaleString()} / ¥${target.toLocaleString()} (${percent}%)</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill ${isOver ? 'over' : ''}" style="width: ${percent}%;"></div>
+          </div>
+        `;
+        progressContainer.appendChild(item);
+      });
+    }
+
+    /* 【グラフ/分析タブ】 レンダリング */
     function renderAnalytics() {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -814,6 +1126,46 @@
         return d.getFullYear() === year && d.getMonth() === month;
       });
 
+      // 0. 共通の目標 vs 実績 グラフ
+      const budgets = getStoredBudgets();
+      const sharedLabels = [];
+      const sharedBudgets = [];
+      const sharedActuals = [];
+
+      const curSharedCatTotals = {};
+      currentFiltered.forEach(i => {
+        const cat = normalizeCategory(i.category);
+        if (cat.startsWith("共通：")) {
+          curSharedCatTotals[cat] = (curSharedCatTotals[cat] || 0) + (Number(i.amount) || 0);
+        }
+      });
+
+      sharedCategories.forEach(c => {
+        const b = budgets[`shared_${c}`] || 0;
+        const a = curSharedCatTotals[c] || 0;
+        if (b > 0 || a > 0) {
+          sharedLabels.push(c.replace("共通：", "").replace(" (ゆうき6:れな4)", ""));
+          sharedBudgets.push(b);
+          sharedActuals.push(a);
+        }
+      });
+
+      const ctxSBC = document.getElementById('sharedBudgetCompareChart').getContext('2d');
+      if (chartSharedBudgetCompare) chartSharedBudgetCompare.destroy();
+
+      chartSharedBudgetCompare = new Chart(ctxSBC, {
+        type: 'bar',
+        data: {
+          labels: sharedLabels,
+          datasets: [
+            { label: '共通目標', data: sharedBudgets, backgroundColor: '#ccc' },
+            { label: '共通実績', data: sharedActuals, backgroundColor: '#3b7e5b' }
+          ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      // 1. 個人 vs 共通 グラフ
       let yukiPersonal = 0, renaPersonal = 0, sharedTotal = 0;
       currentFiltered.forEach(i => {
         const amt = Number(i.amount) || 0;
@@ -837,6 +1189,7 @@
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
       });
 
+      // 2. 先月との比較 グラフ
       const prevDate = new Date(year, month - 1, 1);
       const prevFiltered = allData.filter(item => {
         if (!item.date || item.type !== "支出") return false;
@@ -869,6 +1222,7 @@
         options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
       });
 
+      // 3. 過去6ヶ月の推移 グラフ
       const trendLabels = [];
       const trendData = [];
       for (let i = 5; i >= 0; i--) {
@@ -1019,12 +1373,15 @@
             <option value="共通：食料品">共通：食料品</option>
             <option value="共通：日用品">共通：日用品</option>
             <option value="共通：外食・カフェ">共通：外食・カフェ</option>
+            <option value="共通：家具・家電">共通：家具・家電</option>
             <option value="共通：消耗品">共通：消耗品</option>
             <option value="共通：その他">共通：その他</option>
           </optgroup>
           <optgroup label="個人（折半なし）">
             <option value="個人：食料品">個人：食料品</option>
             <option value="個人：日用品">個人：日用品</option>
+            <option value="個人：家具・家電">個人：家具・家電</option>
+            <option value="個人：消耗品">個人：消耗品</option>
             <option value="個人：娯楽・イベント">個人：娯楽・イベント</option>
             <option value="個人：その他">個人：その他</option>
           </optgroup>
