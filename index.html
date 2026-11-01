@@ -553,7 +553,7 @@
       <select id="selectCategory" class="select-small"></select>
       <input type="text" id="inputMemo" class="input-memo" placeholder="メモ">
       <input type="number" id="inputAmount" class="input-amount" placeholder="金額">
-      <button class="add-btn" onclick="addData()">＋</button>
+      <button class="add-btn" id="addRecordBtn" onclick="addData()">＋</button>
     </div>
   </div>
 
@@ -662,6 +662,7 @@
 
     function normalizeCategory(cat) {
       if (!cat) return "共通：その他";
+      cat = String(cat);
       if (cat === "個人利用") return "個人：娯楽・イベント";
       if (cat === "家賃") return "共通：家賃 (ゆうき6:れな4)";
       if (incomeCategories.includes(cat)) return cat;
@@ -759,7 +760,13 @@
     }
 
     function getStoredBudgets() {
-      return JSON.parse(localStorage.getItem("app_budgets") || "{}");
+      try {
+        const value = JSON.parse(localStorage.getItem("app_budgets") || "{}");
+        return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+      } catch (err) {
+        console.warn("予算設定の復元に失敗しました", err);
+        return {};
+      }
     }
 
     function renderBudgetSettingInputs() {
@@ -787,11 +794,16 @@
 
     function saveBudgetsFromSettings() {
       const budgets = {};
-      document.querySelectorAll(".budget-input-row input").forEach(input => {
+      for (const input of document.querySelectorAll(".budget-input-row input")) {
         const key = input.getAttribute("data-key");
-        const val = Number(input.value) || 0;
+        const val = Number(input.value);
+        if (!Number.isFinite(val) || val < 0 || !Number.isInteger(val)) {
+          alert("目標額は0以上の整数で入力してください。");
+          input.focus();
+          return;
+        }
         if (val > 0) budgets[key] = val;
-      });
+      }
       localStorage.setItem("app_budgets", JSON.stringify(budgets));
       alert("目標額（予算・貯金）を保存しました");
       
@@ -868,7 +880,12 @@
     }
 
     function changeMonth(delta) {
+      // 月末（31日等）のまま setMonth すると翌々月に飛ぶため、いったん1日にする。
+      const oldDay = currentDate.getDate();
+      currentDate.setDate(1);
       currentDate.setMonth(currentDate.getMonth() + delta);
+      currentDate.setDate(Math.min(oldDay, new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()));
+      document.getElementById("inputDate").value = formatDateInput(currentDate);
       updateMonthDisplay();
       renderUI();
       if (document.getElementById("tabAnalytics").classList.contains("active")) renderAnalytics();
@@ -890,17 +907,122 @@
       btn.className = `toggle-btn ${currentUser === "ゆうき" ? "btn-user-me" : "btn-user-partner"}`;
     }
 
+    // APIサーバー側の実装は添付されていないため、既存の action 名とデータ形式を維持する。
+    // fetch はHTTP 200でもアプリケーションエラーを返す場合がある。
+    async function requestGAS(payload) {
+      const options = payload === undefined
+        ? { cache: "no-store" }
+        : { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(payload) };
+      const res = await fetch(GAS_URL, options);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.text();
+      let result;
+      try {
+        result = JSON.parse(body);
+      } catch (err) {
+        if (payload === undefined) throw new Error("サーバーからJSONを取得できませんでした。");
+        if (!body.trim() || /^\s*<!doctype|^\s*<html/i.test(body)) {
+          throw new Error("サーバーが想定外のレスポンスを返しました。");
+        }
+        if (/error|failed|exception|エラー|失敗/i.test(body)) throw new Error(body.slice(0, 160));
+        return body;  // 既存GASが単純な成功文字列を返す場合に対応
+      }
+      if (result && !Array.isArray(result) && typeof result === "object" &&
+          (result.success === false || result.ok === false || result.status === "error" || result.error)) {
+        throw new Error(String(result.message || result.error || "サーバーでエラーが発生しました。"));
+      }
+      return result;
+    }
+
+    function formatDateInput(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    // 日付のみの文字列は日付として解釈し、ISO時刻は家計簿の日本時間で解釈する。
+    function getRecordMonth(item) {
+      if (!item || !item.date) return null;
+      const date = item.date;
+      if (typeof date === "string") {
+        const dateOnly = date.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+        if (dateOnly) {
+          const yy = Number(dateOnly[1]), mm = Number(dateOnly[2]), dd = Number(dateOnly[3]);
+          if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= new Date(yy, mm, 0).getDate())
+            return { year: yy, month: mm - 1, day: dd };
+          return null;
+        }
+      }
+      const d = new Date(date);
+      if (Number.isNaN(d.getTime())) return null;
+      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric"
+      }).formatToParts(d).filter(p => p.type !== "literal").map(p => [p.type, Number(p.value)]));
+      return { year: parts.year, month: parts.month - 1, day: parts.day };
+    }
+
+    function isRecordInMonth(item, year, month) {
+      const d = getRecordMonth(item);
+      return !!d && d.year === year && d.month === month;
+    }
+
+    function displayRecordDate(item) {
+      const d = getRecordMonth(item);
+      return d ? `${d.year}-${String(d.month + 1).padStart(2, "0")}-${String(d.day).padStart(2, "0")}` : String(item.date || "");
+    }
+
+    function parseMoney(value) {
+      const n = typeof value === "string" ? Number(value.replace(/[￥¥,\s]/g, "")) : Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    // ゆうき側に余りの1円を割り当て、両者の負担額が必ず支出総額と一致する。
+    function sharedAmountAllocation(amount, category) {
+      const yuki = Math.round(amount * (category.includes("家賃") ? 0.6 : 0.5));
+      return { yuki, rena: amount - yuki };
+    }
+
+    function validatedMoney(value) {
+      const n = Number(value);
+      return Number.isSafeInteger(n) && n > 0 ? n : null;
+    }
+
+    function showError(message, err) {
+      console.error(message, err);
+      document.getElementById("statusMessage").textContent = message;
+      alert(`${message}${err?.message ? "\n" + err.message : ""}`);
+    }
+
+    // グラフCDNが読み込めなくても、入力・集計機能は使えるようにする。
+    function createChartSafe(ctx, config) {
+      if (typeof Chart === "function") return new Chart(ctx, config);
+      const canvas = ctx.canvas;
+      canvas.style.display = "none";
+      if (!canvas.nextElementSibling?.classList.contains("chart-fallback")) {
+        const note = document.createElement("p");
+        note.className = "empty-msg chart-fallback";
+        note.textContent = "グラフを読み込めませんでした（Chart.jsへの接続をご確認ください）。";
+        canvas.insertAdjacentElement("afterend", note);
+      }
+      return null;
+    }
+
+    let busyOperation = false;
+
     async function loadData() {
       const statusElement = document.getElementById("statusMessage");
       statusElement.textContent = "読み込み中...";
-
       try {
-        const res = await fetch(GAS_URL);
-        allData = await res.json();
+        const result = await requestGAS();
+        const records = Array.isArray(result) ? result
+          : (Array.isArray(result?.data) ? result.data
+            : (Array.isArray(result?.records) ? result.records : null));
+        if (!records) throw new Error("取得データが配列ではありません。GASの返却形式を確認してください。");
+        allData = records;
         statusElement.textContent = "";
         renderUI();
+        if (document.getElementById("tabAnalytics").classList.contains("active")) renderAnalytics();
+        if (document.getElementById("tabIndividual").classList.contains("active")) renderIndividualView();
       } catch (err) {
-        statusElement.textContent = "データの取得に失敗しました。";
+        statusElement.textContent = `データの取得に失敗しました: ${err.message}`;
         console.error(err);
       }
     }
@@ -917,9 +1039,7 @@
       const month = currentDate.getMonth();
 
       const filtered = allData.filter(item => {
-        if (!item.date) return false;
-        const d = new Date(item.date);
-        return d.getFullYear() === year && d.getMonth() === month;
+        return isRecordInMonth(item, year, month);
       });
 
       if (filtered.length === 0) {
@@ -938,10 +1058,11 @@
       let categoryTotals = {};
 
       filtered.slice().reverse().forEach(item => {
-        const amt = Number(item.amount) || 0;
+        const amt = parseMoney(item.amount);
         const isExp = item.type === "支出";
         const cat = normalizeCategory(item.category);
 
+        if (item.type !== "支出" && item.type !== "収入") return;
         if (!isExp) {
           // 収入
           if (item.user === "れな") renaInc += amt;
@@ -952,13 +1073,9 @@
           categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
 
           if (cat.startsWith("共通：")) {
-            if (cat.includes("家賃")) {
-              yukiSharedTarget += amt * 0.6;
-              renaSharedTarget += amt * 0.4;
-            } else {
-              yukiSharedTarget += amt * 0.5;
-              renaSharedTarget += amt * 0.5;
-            }
+            const shares = sharedAmountAllocation(amt, cat);
+            yukiSharedTarget += shares.yuki;
+            renaSharedTarget += shares.rena;
             if (item.user === "れな") renaPaidShared += amt;
             else yukiPaidShared += amt;
           } else {
@@ -971,24 +1088,47 @@
         const isShared = cat.startsWith("共通：");
         const catClass = isIncome ? 'cat-income' : (isShared ? 'cat-shared' : 'cat-personal');
 
-        const li = document.createElement("li");
-        li.className = "record-item";
-        li.innerHTML = `
-          <div class="record-main">
-            <div><span class="record-category ${catClass}">${cat}</span></div>
-            <div class="record-memo">${item.memo || item.type}</div>
-            <div class="record-sub">${item.date} (${item.user})</div>
-          </div>
-          <div class="record-right">
-            <span class="record-amount ${isIncome ? 'amount-income' : 'amount-expense'}">
-              ${isIncome ? '+' : '-'}¥${amt.toLocaleString()}
-            </span>
-            <button class="action-btn edit-btn" onclick="openEditModal(${item.rowIndex}, '${cat}', '${item.memo || ''}', ${amt})">編集</button>
-            <button class="action-btn delete-btn" onclick="deleteData(${item.rowIndex})">削除</button>
-          </div>
-        `;
-        listElement.appendChild(li);
-        fullListElement.appendChild(li.cloneNode(true));
+        // ユーザー入力はHTMLに埋め込まずtextContentで表示し、イベントは直接登録する。
+        const buildRecordItem = () => {
+          const li = document.createElement("li");
+          li.className = "record-item";
+          const main = document.createElement("div");
+          main.className = "record-main";
+          const catWrap = document.createElement("div");
+          const catSpan = document.createElement("span");
+          catSpan.className = `record-category ${catClass}`;
+          catSpan.textContent = cat;
+          catWrap.appendChild(catSpan);
+          main.appendChild(catWrap);
+          const memo = document.createElement("div");
+          memo.className = "record-memo";
+          memo.textContent = String(item.memo || item.type);
+          main.appendChild(memo);
+          const sub = document.createElement("div");
+          sub.className = "record-sub";
+          sub.textContent = `${displayRecordDate(item)} (${String(item.user || "")})`;
+          main.appendChild(sub);
+          const right = document.createElement("div");
+          right.className = "record-right";
+          const amountText = document.createElement("span");
+          amountText.className = `record-amount ${isIncome ? "amount-income" : "amount-expense"}`;
+          amountText.textContent = `${isIncome ? "+" : "-"}¥${amt.toLocaleString()}`;
+          right.appendChild(amountText);
+          const edit = document.createElement("button");
+          edit.className = "action-btn edit-btn";
+          edit.textContent = "編集";
+          edit.addEventListener("click", () => openEditModal(item.rowIndex, cat, String(item.memo || ""), amt, item.id, item.type));
+          right.appendChild(edit);
+          const del = document.createElement("button");
+          del.className = "action-btn delete-btn";
+          del.textContent = "削除";
+          del.addEventListener("click", () => deleteData(item.rowIndex, item.id));
+          right.appendChild(del);
+          li.append(main, right);
+          return li;
+        };
+        listElement.appendChild(buildRecordItem());
+        fullListElement.appendChild(buildRecordItem());
       });
 
       const totalInc = yukiInc + renaInc;
@@ -1010,7 +1150,7 @@
       const yukiDiff = yukiPaidShared - yukiSharedTarget;
       const splitElem = document.getElementById("splitResult");
 
-      if (Math.abs(yukiDiff) < 1) {
+      if (Math.abs(yukiDiff) < 0.5) {
         splitElem.innerHTML = "精算結果 (共通分): 精算の必要はありません";
       } else if (yukiDiff > 0) {
         splitElem.innerHTML = `精算結果 (共通分)<br>れな ➔ ゆうき: <b>¥${Math.round(yukiDiff).toLocaleString()}</b> 支払い`;
@@ -1029,7 +1169,7 @@
       if (chartHome) chartHome.destroy();
       if (labels.length === 0) return;
 
-      chartHome = new Chart(ctx, {
+      chartHome = createChartSafe(ctx, {
         type: 'doughnut',
         data: {
           labels: labels,
@@ -1051,13 +1191,11 @@
       const month = currentDate.getMonth();
 
       document.getElementById("indivSummaryTitle").textContent = `${selectedIndivUser}の当月収支`;
-      document.getElementById("indivChartTitle").textContent = `${selectedIndivUser}の支出・貯金内訳`;
+      document.getElementById("indivChartTitle").textContent = `${selectedIndivUser}が支払った支出・貯金内訳`;
       document.getElementById("indivCompareTitle").textContent = `${selectedIndivUser}の目標 vs 実際`;
 
       const monthData = allData.filter(item => {
-        if (!item.date) return false;
-        const d = new Date(item.date);
-        return d.getFullYear() === year && d.getMonth() === month;
+        return isRecordInMonth(item, year, month);
       });
 
       let indivInc = 0;
@@ -1068,27 +1206,21 @@
       const catActuals = {};
 
       monthData.forEach(i => {
-        const amt = Number(i.amount) || 0;
+        const amt = parseMoney(i.amount);
         const cat = normalizeCategory(i.category);
-
+        if (i.type === "収入") {
+          if (i.user === selectedIndivUser) indivInc += amt;
+          return;
+        }
+        if (i.type !== "支出") return;
         if (cat.startsWith("共通：")) {
           totalSharedExp += amt;
-          if (cat.includes("家賃")) {
-            indivSharedTarget += selectedIndivUser === "ゆうき" ? amt * 0.6 : amt * 0.4;
-          } else {
-            indivSharedTarget += amt * 0.5;
-          }
+          const shares = sharedAmountAllocation(amt, cat);
+          indivSharedTarget += selectedIndivUser === "ゆうき" ? shares.yuki : shares.rena;
         }
-
         if (i.user === selectedIndivUser) {
-          if (i.type === "収入") {
-            indivInc += amt;
-          } else {
-            if (cat.startsWith("個人：")) {
-              indivPersonalExp += amt;
-            }
-            catActuals[cat] = (catActuals[cat] || 0) + amt;
-          }
+          if (cat.startsWith("個人：")) indivPersonalExp += amt;
+          catActuals[cat] = (catActuals[cat] || 0) + amt;
         }
       });
 
@@ -1106,7 +1238,7 @@
       const ctxCat = document.getElementById('indivCategoryChart').getContext('2d');
       if (chartIndivCategory) chartIndivCategory.destroy();
 
-      chartIndivCategory = new Chart(ctxCat, {
+      chartIndivCategory = createChartSafe(ctxCat, {
         type: 'bar',
         data: {
           labels: labels,
@@ -1144,7 +1276,7 @@
       const ctxB = document.getElementById('indivBudgetChart').getContext('2d');
       if (chartIndivBudget) chartIndivBudget.destroy();
 
-      chartIndivBudget = new Chart(ctxB, {
+      chartIndivBudget = createChartSafe(ctxB, {
         type: 'bar',
         data: {
           labels: compareLabels,
@@ -1196,9 +1328,7 @@
       const month = currentDate.getMonth();
 
       const currentFiltered = allData.filter(item => {
-        if (!item.date || item.type !== "支出") return false;
-        const d = new Date(item.date);
-        return d.getFullYear() === year && d.getMonth() === month;
+        return item.type === "支出" && isRecordInMonth(item, year, month);
       });
 
       // 0. 共通の目標 vs 実績 グラフ
@@ -1211,7 +1341,7 @@
       currentFiltered.forEach(i => {
         const cat = normalizeCategory(i.category);
         if (cat.startsWith("共通：")) {
-          curSharedCatTotals[cat] = (curSharedCatTotals[cat] || 0) + (Number(i.amount) || 0);
+          curSharedCatTotals[cat] = (curSharedCatTotals[cat] || 0) + (parseMoney(i.amount));
         }
       });
 
@@ -1228,7 +1358,7 @@
       const ctxSBC = document.getElementById('sharedBudgetCompareChart').getContext('2d');
       if (chartSharedBudgetCompare) chartSharedBudgetCompare.destroy();
 
-      chartSharedBudgetCompare = new Chart(ctxSBC, {
+      chartSharedBudgetCompare = createChartSafe(ctxSBC, {
         type: 'bar',
         data: {
           labels: sharedLabels,
@@ -1243,7 +1373,7 @@
       // 1. 個人 vs 共通 グラフ
       let yukiPersonal = 0, renaPersonal = 0, sharedTotal = 0;
       currentFiltered.forEach(i => {
-        const amt = Number(i.amount) || 0;
+        const amt = parseMoney(i.amount);
         const cat = normalizeCategory(i.category);
         if (cat.startsWith("個人：")) {
           if (i.user === "れな") renaPersonal += amt;
@@ -1255,7 +1385,7 @@
 
       const ctxPS = document.getElementById('personalVsSharedChart').getContext('2d');
       if (chartPersonalShared) chartPersonalShared.destroy();
-      chartPersonalShared = new Chart(ctxPS, {
+      chartPersonalShared = createChartSafe(ctxPS, {
         type: 'pie',
         data: {
           labels: ['共通支出', 'ゆうき個人', 'れな個人'],
@@ -1267,25 +1397,23 @@
       // 2. 先月との比較 グラフ
       const prevDate = new Date(year, month - 1, 1);
       const prevFiltered = allData.filter(item => {
-        if (!item.date || item.type !== "支出") return false;
-        const d = new Date(item.date);
-        return d.getFullYear() === prevDate.getFullYear() && d.getMonth() === prevDate.getMonth();
+        return item.type === "支出" && isRecordInMonth(item, prevDate.getFullYear(), prevDate.getMonth());
       });
 
       const curCat = {}, prevCat = {};
       currentFiltered.forEach(i => {
         const cat = normalizeCategory(i.category);
-        curCat[cat] = (curCat[cat] || 0) + (Number(i.amount) || 0);
+        curCat[cat] = (curCat[cat] || 0) + (parseMoney(i.amount));
       });
       prevFiltered.forEach(i => {
         const cat = normalizeCategory(i.category);
-        prevCat[cat] = (prevCat[cat] || 0) + (Number(i.amount) || 0);
+        prevCat[cat] = (prevCat[cat] || 0) + (parseMoney(i.amount));
       });
 
       const allCats = Array.from(new Set([...Object.keys(curCat), ...Object.keys(prevCat)]));
       const ctxMC = document.getElementById('monthCompareChart').getContext('2d');
       if (chartMonthCompare) chartMonthCompare.destroy();
-      chartMonthCompare = new Chart(ctxMC, {
+      chartMonthCompare = createChartSafe(ctxMC, {
         type: 'bar',
         data: {
           labels: allCats,
@@ -1305,17 +1433,15 @@
         trendLabels.push(`${d.getMonth() + 1}月`);
 
         const mExp = allData.filter(item => {
-          if (!item.date || item.type !== "支出") return false;
-          const itemD = new Date(item.date);
-          return itemD.getFullYear() === d.getFullYear() && itemD.getMonth() === d.getMonth();
-        }).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+          return item.type === "支出" && isRecordInMonth(item, d.getFullYear(), d.getMonth());
+        }).reduce((sum, item) => sum + (parseMoney(item.amount)), 0);
 
         trendData.push(mExp);
       }
 
       const ctxTrend = document.getElementById('trendChart').getContext('2d');
       if (chartTrend) chartTrend.destroy();
-      chartTrend = new Chart(ctxTrend, {
+      chartTrend = createChartSafe(ctxTrend, {
         type: 'line',
         data: {
           labels: trendLabels,
@@ -1326,9 +1452,25 @@
     }
 
     /* 編集モーダル制御 */
-    function openEditModal(rowIndex, cat, memo, amount) {
+    let selectedEditRecordId = null;
+    function openEditModal(rowIndex, cat, memo, amount, recordId, recordType) {
+      selectedEditRecordId = recordId == null || recordId === "" ? null : String(recordId);
       document.getElementById("editRowIndex").value = rowIndex;
-      document.getElementById("editCategory").value = cat;
+      const editCategory = document.getElementById("editCategory");
+      // 「収入」を「支出」に誤分類したまま保存しないよう、選択肢を制限する。
+      for (const option of editCategory.options) {
+        const isIncomeCat = incomeCategories.includes(option.value);
+        option.disabled = recordType === "収入" ? !isIncomeCat : isIncomeCat;
+      }
+      // 旧カテゴリなど、一覧に存在しない値でも勝手に変更されないようにする。
+      editCategory.querySelector('option[data-legacy="true"]')?.remove();
+      if (![...editCategory.options].some(opt => opt.value === cat)) {
+        const opt = new Option(cat, cat);
+        opt.disabled = false;
+        opt.dataset.legacy = "true";
+        editCategory.add(opt);
+      }
+      editCategory.value = cat;
       document.getElementById("editMemo").value = memo;
       document.getElementById("editAmount").value = amount;
       document.getElementById("editModal").style.display = "flex";
@@ -1336,130 +1478,131 @@
 
     function closeEditModal() {
       document.getElementById("editModal").style.display = "none";
+      selectedEditRecordId = null;
     }
 
     async function saveEdit() {
-      const rowIndex = document.getElementById("editRowIndex").value;
+      if (busyOperation) return;
+      const rowIndex = Number(document.getElementById("editRowIndex").value);
       const cat = document.getElementById("editCategory").value;
       const memo = document.getElementById("editMemo").value;
-      const amount = document.getElementById("editAmount").value;
-
-      closeEditModal();
+      const amount = validatedMoney(document.getElementById("editAmount").value);
+      if (!Number.isSafeInteger(rowIndex) || rowIndex < 2 || !cat || amount === null) {
+        alert("カテゴリと、1円以上の整数の金額を確認してください。");
+        return;
+      }
+      busyOperation = true;
       document.getElementById("statusMessage").textContent = "更新中...";
-
       try {
-        await fetch(GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({
-            action: "update",
-            rowIndex: Number(rowIndex),
-            category: cat,
-            memo: memo,
-            amount: amount
-          })
-        });
+        await requestGAS({ action: "update", rowIndex, ...(selectedEditRecordId ? { id: selectedEditRecordId } : {}), category: cat, memo, amount: String(amount) });
+        closeEditModal();
         await loadData();
       } catch (err) {
-        alert("更新に失敗しました");
+        showError("更新に失敗しました。データは再取得してご確認ください。", err);
+      } finally {
+        busyOperation = false;
       }
     }
 
+    // サーバーの保存後に応答が途切れても、同じIDで再送して重複登録を防ぐ。
+    let pendingSingleAdd = null;
+    let pendingReceiptAdd = null;
+    function createClientRecordId() {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return "ui_" + crypto.randomUUID();
+      }
+      return "ui_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    }
+
     async function addData() {
-      const memo = document.getElementById("inputMemo").value.trim();
-      const amount = document.getElementById("inputAmount").value;
+      if (busyOperation) return;
+      const memoInput = document.getElementById("inputMemo");
+      const amountInput = document.getElementById("inputAmount");
+      const memo = memoInput.value.trim();
+      const amount = validatedMoney(amountInput.value);
       const date = document.getElementById("inputDate").value;
       const category = document.getElementById("selectCategory").value;
-
-      if (!amount) { alert("金額を入力してください"); return; }
-
-      const payload = {
-        action: "add",
-        date: date,
-        type: currentType,
-        user: currentUser,
-        category: category,
-        memo: memo,
-        amount: amount
-      };
-
+      if (amount === null) { alert("金額は1円以上の整数で入力してください"); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !getRecordMonth({ date })) {
+        alert("有効な日付を入力してください"); return;
+      }
+      if (!category) { alert("カテゴリを選択してください"); return; }
+      const values = { date, type: currentType, user: currentUser, category, memo, amount: String(amount) };
+      const signature = JSON.stringify(values);
+      if (!pendingSingleAdd || pendingSingleAdd.signature !== signature) {
+        pendingSingleAdd = { signature, id: createClientRecordId() };
+      }
+      const payload = { action: "add", ...values, id: pendingSingleAdd.id };
+      busyOperation = true;
+      document.getElementById("addRecordBtn").disabled = true;
       document.getElementById("statusMessage").textContent = "送信中...";
-      document.getElementById("inputMemo").value = "";
-      document.getElementById("inputAmount").value = "";
-
       try {
-        await fetch(GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify(payload)
-        });
+        await requestGAS(payload);
+        pendingSingleAdd = null;
+        // GASが失敗した場合には入力を残し、二重送信しにくくする。
+        memoInput.value = "";
+        amountInput.value = "";
         await loadData();
       } catch (err) {
-        alert("送信に失敗しました");
+        showError("登録に失敗しました。重複登録を避けるため、履歴を確認してから再送信してください。", err);
+      } finally {
+        busyOperation = false;
+        document.getElementById("addRecordBtn").disabled = false;
       }
     }
 
     async function handleReceiptUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
+      const file = event.target.files?.[0];
+      if (!file || busyOperation) return;
+      const input = event.target;
+      busyOperation = true;
       document.getElementById("statusMessage").textContent = "レシート解析中...";
-
-      const reader = new FileReader();
-      reader.onload = async function(e) {
-        const base64Data = e.target.result.split(',')[1];
-        try {
-          const res = await fetch(GAS_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-              action: "analyzeReceipt",
-              imageData: base64Data,
-              mimeType: file.type
-            })
-          });
-          const result = await res.json();
-          document.getElementById("statusMessage").textContent = "";
-
-          if (result.items && result.items.length > 0) {
-            showReceiptModal(result.items);
-          } else {
-            alert("項目が読み取れませんでした。手動で入力してください。");
-          }
-        } catch (err) {
-          alert("解析に失敗しました。");
-          document.getElementById("statusMessage").textContent = "";
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        if (!file.type.startsWith("image/")) throw new Error("画像ファイルを選択してください。");
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(",")[1]);
+          reader.onerror = () => reject(reader.error || new Error("画像を開けませんでした"));
+          reader.readAsDataURL(file);
+        });
+        const result = await requestGAS({ action: "analyzeReceipt", imageData: base64Data, mimeType: file.type });
+        document.getElementById("statusMessage").textContent = "";
+        if (Array.isArray(result?.items) && result.items.length) showReceiptModal(result.items);
+        else alert("項目が読み取れませんでした。手動で入力してください。");
+      } catch (err) {
+        showError("レシート解析に失敗しました。", err);
+      } finally {
+        input.value = ""; // 同じ写真の再アップロードが可能
+        busyOperation = false;
+      }
     }
 
     function showReceiptModal(items) {
       const container = document.getElementById("receiptItemsContainer");
-      container.innerHTML = "";
-
-      items.forEach((item) => {
+      container.replaceChildren();
+      const cats = [...sharedCategories, ...personalCategories];
+      items.forEach(item => {
         const row = document.createElement("div");
         row.className = "input-row";
         row.style.marginBottom = "8px";
-
-        let catOptionsHtml = `
-          <optgroup label="共通（折半対象）">
-            ${sharedCategories.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </optgroup>
-          <optgroup label="個人（折半なし）">
-            ${personalCategories.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </optgroup>
-        `;
-
-        row.innerHTML = `
-          <input type="text" class="r-memo" value="${item.memo}" style="flex: 2; min-width: 100px;">
-          <input type="number" class="r-amount" value="${item.amount}" style="flex: 1.2; min-width: 70px; font-weight:bold;">
-          <select class="r-category" style="flex: 1.5; min-width: 90px;">${catOptionsHtml}</select>
-        `;
+        const memo = document.createElement("input");
+        memo.type = "text";
+        memo.className = "r-memo";
+        memo.value = String(item.memo ?? "");
+        memo.style.cssText = "flex:2; min-width:100px";
+        const amount = document.createElement("input");
+        amount.type = "number";
+        amount.className = "r-amount";
+        amount.value = item.amount == null || item.amount === "" ? "" : String(parseMoney(item.amount));
+        amount.style.cssText = "flex:1.2; min-width:70px; font-weight:bold";
+        const category = document.createElement("select");
+        category.className = "r-category";
+        category.style.cssText = "flex:1.5; min-width:90px";
+        for (const cat of cats) category.add(new Option(cat, cat));
+        if (cats.includes(item.category)) category.value = item.category;
+        row.append(memo, amount, category);
         container.appendChild(row);
       });
-
       document.getElementById("receiptModal").style.display = "flex";
     }
 
@@ -1468,60 +1611,57 @@
     }
 
     async function saveReceiptItems() {
+      if (busyOperation) return;
       const rows = document.querySelectorAll("#receiptItemsContainer .input-row");
       const date = document.getElementById("inputDate").value;
-      let records = [];
-
-      rows.forEach(row => {
+      if (!getRecordMonth({ date })) { alert("日付を確認してください。"); return; }
+      const records = [];
+      for (const row of rows) {
         const memo = row.querySelector(".r-memo").value;
-        const amount = row.querySelector(".r-amount").value;
-        const category = row.querySelector(".r-category").value;
-
-        if (amount) {
-          records.push({
-            date: date,
-            type: "支出",
-            user: currentUser,
-            category: category,
-            memo: memo,
-            amount: amount
-          });
-        }
-      });
-
-      if (records.length === 0) return;
-
-      closeReceiptModal();
+        const raw = row.querySelector(".r-amount").value;
+        if (!raw.trim()) continue;
+        const amount = validatedMoney(raw);
+        if (amount === null) { alert("レシートの金額は1円以上の整数で入力してください。"); return; }
+        records.push({ date, type: "支出", user: currentUser, category: row.querySelector(".r-category").value, memo, amount: String(amount) });
+      }
+      if (!records.length) { alert("登録する明細がありません。"); return; }
+      const signature = JSON.stringify(records);
+      if (!pendingReceiptAdd || pendingReceiptAdd.signature !== signature) {
+        pendingReceiptAdd = { signature, ids: records.map(() => createClientRecordId()) };
+      }
+      records.forEach((r, i) => { r.id = pendingReceiptAdd.ids[i]; });
+      busyOperation = true;
       document.getElementById("statusMessage").textContent = "一括登録中...";
-
       try {
-        await fetch(GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "add", records: records })
-        });
+        // GAS側が records 配列による一括追加に対応する必要がある（元の仕様）。
+        await requestGAS({ action: "add", records });
+        pendingReceiptAdd = null;
+        closeReceiptModal();
         await loadData();
       } catch (err) {
-        alert("登録に失敗しました");
+        showError("レシートの一括登録に失敗しました。", err);
+      } finally {
+        busyOperation = false;
       }
     }
 
-    async function deleteData(rowIndex) {
+    async function deleteData(rowIndex, recordId) {
+      if (busyOperation) return;
+      const n = Number(rowIndex);
+      if (!Number.isSafeInteger(n) || n < 2) { alert("削除対象が不正です。再読み込みしてください。"); return; }
       if (!confirm("この記録をスプレッドシートから完全に削除しますか？")) return;
-
+      busyOperation = true;
       document.getElementById("statusMessage").textContent = "削除中...";
-
       try {
-        await fetch(GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "delete", rowIndex: rowIndex })
-        });
+        await requestGAS({ action: "delete", rowIndex: n, ...(recordId ? { id: String(recordId) } : {}) });
         await loadData();
       } catch (err) {
-        alert("削除に失敗しました");
+        showError("削除に失敗しました。", err);
+      } finally {
+        busyOperation = false;
       }
     }
+
   </script>
 </body>
 </html>
