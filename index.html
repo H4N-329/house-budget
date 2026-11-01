@@ -636,16 +636,26 @@
     ];
 
     const sharedCategories = [
-      "共通：食料品", "共通：日用品", "共通：家賃 (ゆうき6:れな4)", "共通：光熱費・住居",
-      "共通：外食・カフェ", "共通：家具・家電", "共通：消耗品", "共通：サブスク・通信",
+      "共通：食料品", "共通：日用品・消耗品", "共通：家賃 (ゆうき6:れな4)", "共通：光熱費",
+      "共通：外食・カフェ", "共通：家具・家電", "共通：サブスク・通信",
       "共通：交通費", "共通：娯楽・イベント", "共通：貯金", "共通：その他"
     ];
 
     const personalCategories = [
-      "個人：食料品", "個人：日用品", "個人：外食・カフェ", "個人：衣服・美容",
-      "個人：家具・家電", "個人：消耗品", "個人：サブスク・通信", "個人：交通費",
+      "個人：飲食", "個人：日用品・消耗品", "個人：外食・カフェ", "個人：衣服・美容",
+      "個人：家具・家電", "個人：サブスク・通信", "個人：交通費",
       "個人：娯楽・イベント", "個人：貯金", "個人：その他"
     ];
+
+    // 過去に保存されたカテゴリは表示・集計・編集時に新しい名称へ統一する。
+    const legacyCategoryMap = Object.freeze({
+      "共通：日用品": "共通：日用品・消耗品",
+      "共通：消耗品": "共通：日用品・消耗品",
+      "共通：光熱費・住居": "共通：光熱費",
+      "個人：日用品": "個人：日用品・消耗品",
+      "個人：消耗品": "個人：日用品・消耗品",
+      "個人：食料品": "個人：飲食"
+    });
 
     const incomeCategories = [
       "手取り給与", "ボーナス", "副収入", "その他収入"
@@ -667,9 +677,9 @@
       if (cat === "家賃") return "共通：家賃 (ゆうき6:れな4)";
       if (incomeCategories.includes(cat)) return cat;
       if (!cat.startsWith("共通：") && !cat.startsWith("個人：")) {
-        return "共通：" + cat;
+        cat = "共通：" + cat;
       }
-      return cat;
+      return legacyCategoryMap[cat] || cat;
     }
 
     function updateCategoryDropdowns() {
@@ -762,7 +772,31 @@
     function getStoredBudgets() {
       try {
         const value = JSON.parse(localStorage.getItem("app_budgets") || "{}");
-        return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+        if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+        // 旧カテゴリの予算を統合。2カテゴリを合体した場合は予算金額も合算する。
+        // 元キーを削除して保存するため、2度目以降の読み込みで二重加算しない。
+        const migrated = { ...value };
+        let changed = false;
+        for (const [key, oldAmount] of Object.entries(value)) {
+          const separator = key.indexOf("_");
+          if (separator < 0) continue;
+          const prefix = key.slice(0, separator);
+          const oldCategory = key.slice(separator + 1);
+          const newCategory = legacyCategoryMap[oldCategory];
+          if (!newCategory) continue;
+          const isShared = prefix === "shared" && newCategory.startsWith("共通：");
+          const isPersonal = ["yuki", "rena"].includes(prefix) && newCategory.startsWith("個人：");
+          if (!isShared && !isPersonal) continue;
+          const newKey = `${prefix}_${newCategory}`;
+          const oldValue = Number(oldAmount);
+          if (!Number.isFinite(oldValue) || oldValue < 0) continue;
+          const already = Number(migrated[newKey] || 0);
+          migrated[newKey] = (Number.isFinite(already) && already >= 0 ? already : 0) + oldValue;
+          delete migrated[key];
+          changed = true;
+        }
+        if (changed) localStorage.setItem("app_budgets", JSON.stringify(migrated));
+        return migrated;
       } catch (err) {
         console.warn("予算設定の復元に失敗しました", err);
         return {};
@@ -1599,7 +1633,8 @@
         category.className = "r-category";
         category.style.cssText = "flex:1.5; min-width:90px";
         for (const cat of cats) category.add(new Option(cat, cat));
-        if (cats.includes(item.category)) category.value = item.category;
+        const receivedCategory = normalizeCategory(item.category);
+        if (cats.includes(receivedCategory)) category.value = receivedCategory;
         row.append(memo, amount, category);
         container.appendChild(row);
       });
