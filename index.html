@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ふたり家計簿</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -30,6 +30,9 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* スクロールを許可し、ピンチ・ダブルタップによる拡大縮小を抑える。 */
+    html, body, .modal-content { touch-action: pan-x pan-y; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -193,7 +196,7 @@
       color: var(--text-dark);
       border-radius: 8px;
       padding: 8px;
-      font-size: 13px;
+      font-size: 16px; /* 入力時の自動拡大を抑える。 */
       outline: none;
       min-width: 0;
     }
@@ -611,6 +614,20 @@
   </div>
 
   <script>
+    // Safariのピンチ操作と、PCの拡大縮小操作を抑える。
+    function preventPageZoom(event) {
+      event.preventDefault();
+    }
+    document.addEventListener("gesturestart", preventPageZoom, { passive: false });
+    document.addEventListener("gesturechange", preventPageZoom, { passive: false });
+    document.addEventListener("wheel", event => {
+      if (event.ctrlKey || event.metaKey) event.preventDefault();
+    }, { passive: false });
+    document.addEventListener("keydown", event => {
+      if ((event.ctrlKey || event.metaKey) && ["+", "=", "-", "0"].includes(event.key)) {
+        event.preventDefault();
+      }
+    });
     const GAS_URL = "https://script.google.com/macros/s/AKfycby-s8Cy-46gmYeneR_r6mXjT9fk4YkJs4Vfn19oC1RYju8ZA5Qv5gDdpO-jH1HPUXM/exec";
 
     let currentDate = new Date();
