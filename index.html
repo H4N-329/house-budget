@@ -139,22 +139,24 @@
       border-bottom: 1px solid var(--border-color);
     }
     .record-item:last-child { border-bottom: none; }
-    .record-main { display: flex; flex-direction: column; gap: 2px; }
+    .record-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
     .record-category {
       font-size: 11px;
       padding: 2px 6px;
       border-radius: 4px;
       display: inline-block;
       width: fit-content;
+      max-width: 100%;
+      overflow-wrap: anywhere;
       font-weight: bold;
     }
     .cat-shared { background: #e8f5e9; color: #2e7d32; }
     .cat-personal { background: #fff3e0; color: #e65100; }
     .cat-income { background: #e1f5fe; color: #0288d1; }
 
-    .record-memo { font-size: 14px; font-weight: 500; }
+    .record-memo { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
     .record-sub { font-size: 11px; color: var(--text-muted); }
-    .record-right { text-align: right; display: flex; align-items: center; gap: 6px; }
+    .record-right { text-align: right; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .record-amount { font-size: 15px; font-weight: bold; }
     .amount-income { color: #0288d1; }
     .amount-expense { color: #d32f2f; }
@@ -247,6 +249,15 @@
       gap: 4px;
       white-space: nowrap;
       flex-shrink: 0;
+    }
+    .receipt-picker { position: relative; overflow: hidden; }
+    .receipt-native-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
     }
 
     /* 人物切り替えスイッチ（個別タブ用） */
@@ -547,9 +558,13 @@
       <button class="toggle-btn btn-type" id="btnType" onclick="toggleType()">支出</button>
       <button class="toggle-btn btn-user-me" id="btnUser" onclick="toggleUser()">ゆうき</button>
       <input type="date" id="inputDate" class="input-date">
-      <label class="camera-btn">
+      <label class="camera-btn receipt-picker">
         📷 撮影
-        <input type="file" id="receiptFileInput" accept="image/*" capture="environment" style="display:none;" onchange="handleReceiptUpload(event)">
+        <input type="file" id="receiptFileInput" class="receipt-native-input" accept="image/*" capture="environment" aria-label="カメラでレシートを撮影" onchange="handleReceiptUpload(event)">
+      </label>
+      <label class="camera-btn receipt-picker">
+        🖼️ 写真
+        <input type="file" id="receiptLibraryInput" class="receipt-native-input" accept="image/*" aria-label="写真ライブラリからレシートを選択" onchange="handleReceiptUpload(event)">
       </label>
     </div>
     <div class="input-row">
@@ -648,7 +663,7 @@
     let tutorialStep = 0;
     const tutorialSteps = [
       { title: "ふたり家計簿へようこそ！ (1/3)", text: "画面下の入力バーから、共通・個人のカテゴリや手取り収入・金額を選んで「＋」を押すと、スプレッドシートに反映されます。" },
-      { title: "カメラでレシート撮影 (2/3)", text: "「📷 撮影」ボタンを押すとレシート画像から金額や項目を自動解析できます。" },
+      { title: "レシートを読み込む (2/3)", text: "「📷 撮影」でカメラから、「🖼️ 写真」で写真ライブラリからレシートを読み込めます。解析結果は登録前に修正できます。" },
       { title: "自動で立替精算と収支を計算 (3/3)", text: "手取り収入と支出から全体の収支や個人の手元残金を自動計算します。「👤 個別」タブで個人ごとの分析も可能です！" }
     ];
 
@@ -679,11 +694,17 @@
     ];
 
     window.onload = () => {
-      document.getElementById("inputDate").valueAsDate = new Date();
+      document.getElementById("inputDate").value = formatDateInput(currentDate);
       initSettings();
       updateCategoryDropdowns();
       renderBudgetSettingInputs();
       updateMonthDisplay();
+      updateInputPadding();
+      if (typeof ResizeObserver === "function") {
+        new ResizeObserver(updateInputPadding).observe(document.getElementById("inputBar"));
+      } else {
+        window.addEventListener("resize", updateInputPadding);
+      }
       loadData();
     };
 
@@ -732,31 +753,54 @@
       editElem.innerHTML = editHtml;
     }
 
-    function initSettings() {
-      const isDark = localStorage.getItem("theme_dark") === "true";
-      document.getElementById("themeToggle").checked = isDark;
-      toggleTheme(isDark);
+    function readStoredValue(key) {
+      try {
+        return localStorage.getItem(key);
+      } catch (err) {
+        console.warn("設定の読み込みに失敗しました", err);
+        return null;
+      }
+    }
 
-      const tutEnabled = localStorage.getItem("tutorial_enabled") !== "false";
+    function writeStoredValue(key, value) {
+      try {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+        return true;
+      } catch (err) {
+        console.warn("設定の保存に失敗しました", err);
+        return false;
+      }
+    }
+
+    function initSettings() {
+      const isDark = readStoredValue("theme_dark") === "true";
+      document.getElementById("themeToggle").checked = isDark;
+      toggleTheme(isDark, false);
+
+      const tutEnabled = readStoredValue("tutorial_enabled") !== "false";
       document.getElementById("tutorialToggle").checked = tutEnabled;
 
-      if (tutEnabled && !localStorage.getItem("tutorial_seen")) {
+      if (tutEnabled && !readStoredValue("tutorial_seen")) {
         startTutorial();
       }
     }
 
-    function toggleTheme(isDark) {
+    function toggleTheme(isDark, save = true) {
       if (isDark) {
         document.body.setAttribute("data-theme", "dark");
-        localStorage.setItem("theme_dark", "true");
       } else {
         document.body.removeAttribute("data-theme");
-        localStorage.setItem("theme_dark", "false");
+      }
+      if (save && !writeStoredValue("theme_dark", String(isDark))) {
+        alert("表示設定を保存できませんでした。ブラウザのサイトデータ保存設定を確認してください。");
       }
     }
 
     function toggleTutorialSetting(enabled) {
-      localStorage.setItem("tutorial_enabled", enabled ? "true" : "false");
+      if (!writeStoredValue("tutorial_enabled", String(enabled))) {
+        alert("設定を保存できませんでした。ブラウザのサイトデータ保存設定を確認してください。");
+      }
     }
 
     function startTutorial() {
@@ -782,25 +826,29 @@
     }
 
     function closeTutorial() {
-      localStorage.setItem("tutorial_seen", "true");
+      writeStoredValue("tutorial_seen", "true");
       document.getElementById("tutorialModal").style.display = "none";
     }
 
     function getStoredBudgets() {
       try {
-        const value = JSON.parse(localStorage.getItem("app_budgets") || "{}");
+        const value = JSON.parse(readStoredValue("app_budgets") || "{}");
         if (!value || typeof value !== "object" || Array.isArray(value)) return {};
         // 旧カテゴリの予算を統合。2カテゴリを合体した場合は予算金額も合算する。
         // 元キーを削除して保存するため、2度目以降の読み込みで二重加算しない。
-        const migrated = { ...value };
+        const migrated = {};
+        for (const [key, storedAmount] of Object.entries(value)) {
+          const amount = Number(storedAmount);
+          if (Number.isSafeInteger(amount) && amount >= 0) migrated[key] = amount;
+        }
         let changed = false;
-        for (const [key, oldAmount] of Object.entries(value)) {
+        for (const [key, oldAmount] of Object.entries(migrated)) {
           const separator = key.indexOf("_");
           if (separator < 0) continue;
           const prefix = key.slice(0, separator);
           const oldCategory = key.slice(separator + 1);
           const newCategory = legacyCategoryMap[oldCategory];
-          if (!newCategory) continue;
+          if (typeof newCategory !== "string") continue;
           const isShared = prefix === "shared" && newCategory.startsWith("共通：");
           const isPersonal = ["yuki", "rena"].includes(prefix) && newCategory.startsWith("個人：");
           if (!isShared && !isPersonal) continue;
@@ -812,7 +860,7 @@
           delete migrated[key];
           changed = true;
         }
-        if (changed) localStorage.setItem("app_budgets", JSON.stringify(migrated));
+        if (changed) writeStoredValue("app_budgets", JSON.stringify(migrated));
         return migrated;
       } catch (err) {
         console.warn("予算設定の復元に失敗しました", err);
@@ -830,10 +878,16 @@
           const val = budgets[`${keyPrefix}_${c}`] || 0;
           const row = document.createElement("div");
           row.className = "budget-input-row";
-          row.innerHTML = `
-            <span>${c}</span>
-            <input type="number" data-key="${keyPrefix}_${c}" value="${val}" placeholder="0">
-          `;
+          const label = document.createElement("span");
+          label.textContent = c;
+          const input = document.createElement("input");
+          input.type = "number";
+          input.dataset.key = `${keyPrefix}_${c}`;
+          input.value = String(val);
+          input.placeholder = "0";
+          input.min = "0";
+          input.step = "1";
+          row.append(label, input);
           container.appendChild(row);
         });
       };
@@ -848,14 +902,17 @@
       for (const input of document.querySelectorAll(".budget-input-row input")) {
         const key = input.getAttribute("data-key");
         const val = Number(input.value);
-        if (!Number.isFinite(val) || val < 0 || !Number.isInteger(val)) {
+        if (!Number.isSafeInteger(val) || val < 0) {
           alert("目標額は0以上の整数で入力してください。");
           input.focus();
           return;
         }
         if (val > 0) budgets[key] = val;
       }
-      localStorage.setItem("app_budgets", JSON.stringify(budgets));
+      if (!writeStoredValue("app_budgets", JSON.stringify(budgets))) {
+        alert("目標額を保存できませんでした。ブラウザのサイトデータ保存設定を確認してください。");
+        return;
+      }
       alert("目標額（予算・貯金）を保存しました");
       
       if (document.getElementById("tabIndividual").classList.contains("active")) renderIndividualView();
@@ -868,7 +925,7 @@
 
     function updateSettlementBtnDisplay() {
       const btn = document.getElementById("settlementBtn");
-      const isDone = localStorage.getItem(getSettlementKey()) === "done";
+      const isDone = readStoredValue(getSettlementKey()) === "done";
       if (isDone) {
         btn.textContent = "精算済み ✓";
         btn.classList.add("done");
@@ -880,11 +937,10 @@
 
     function toggleSettlement() {
       const key = getSettlementKey();
-      const current = localStorage.getItem(key);
-      if (current === "done") {
-        localStorage.removeItem(key);
-      } else {
-        localStorage.setItem(key, "done");
+      const current = readStoredValue(key);
+      if (!writeStoredValue(key, current === "done" ? null : "done")) {
+        alert("精算状態を保存できませんでした。ブラウザのサイトデータ保存設定を確認してください。");
+        return;
       }
       updateSettlementBtnDisplay();
     }
@@ -902,9 +958,16 @@
       } else {
         inputBar.style.display = "flex";
       }
+      updateInputPadding();
 
       if (tabId === "tabAnalytics") renderAnalytics();
       if (tabId === "tabIndividual") renderIndividualView();
+    }
+
+    function updateInputPadding() {
+      const inputBar = document.getElementById("inputBar");
+      const inputHeight = inputBar.style.display === "none" ? 0 : inputBar.offsetHeight;
+      document.body.style.paddingBottom = `${inputHeight + 76}px`;
     }
 
     function switchIndivUser(user) {
@@ -958,36 +1021,58 @@
       btn.className = `toggle-btn ${currentUser === "ゆうき" ? "btn-user-me" : "btn-user-partner"}`;
     }
 
-    // APIサーバー側の実装は添付されていないため、既存の action 名とデータ形式を維持する。
-    // fetch はHTTP 200でもアプリケーションエラーを返す場合がある。
-    async function requestGAS(payload) {
+    // 既存GASの成功文字列にも対応し、通信とサーバー側の失敗を区別する。
+    async function requestGAS(payload, timeoutMs = 30000) {
       const options = payload === undefined
         ? { cache: "no-store" }
         : { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(payload) };
-      const res = await fetch(GAS_URL, options);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = await res.text();
-      let result;
+      const controller = new AbortController();
+      options.signal = controller.signal;
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        result = JSON.parse(body);
-      } catch (err) {
-        if (payload === undefined) throw new Error("サーバーからJSONを取得できませんでした。");
-        if (!body.trim() || /^\s*<!doctype|^\s*<html/i.test(body)) {
-          throw new Error("サーバーが想定外のレスポンスを返しました。");
+        const res = await fetch(GAS_URL, options);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = await res.text();
+        let result;
+        try {
+          result = JSON.parse(body);
+        } catch (err) {
+          if (payload === undefined) throw new Error("サーバーからJSONを取得できませんでした。");
+          if (!body.trim() || /^\s*<!doctype|^\s*<html/i.test(body)) {
+            throw new Error("サーバーが想定外のレスポンスを返しました。GASの公開設定を確認してください。");
+          }
+          if (/error|failed|exception|エラー|失敗/i.test(body)) throw new Error(body.slice(0, 160));
+          return body;
         }
-        if (/error|failed|exception|エラー|失敗/i.test(body)) throw new Error(body.slice(0, 160));
-        return body;  // 既存GASが単純な成功文字列を返す場合に対応
+        if (result && !Array.isArray(result) && typeof result === "object" &&
+            (result.success === false || result.ok === false ||
+             ["error", "failed", "failure"].includes(String(result.status).toLowerCase()) || result.error)) {
+          throw new Error(String(result.message || result.error || "サーバーでエラーが発生しました。"));
+        }
+        if (typeof result === "string" && /error|failed|exception|エラー|失敗/i.test(result)) {
+          throw new Error(result.slice(0, 160));
+        }
+        if (payload !== undefined && (result === null || result === false)) {
+          throw new Error("サーバーから保存完了を確認できませんでした。履歴を確認してください。");
+        }
+        return result;
+      } catch (err) {
+        if (err.name === "AbortError") {
+          throw new Error("通信がタイムアウトしました。履歴を確認してから再実行してください。");
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
       }
-      if (result && !Array.isArray(result) && typeof result === "object" &&
-          (result.success === false || result.ok === false || result.status === "error" || result.error)) {
-        throw new Error(String(result.message || result.error || "サーバーでエラーが発生しました。"));
-      }
-      return result;
     }
 
     function formatDateInput(d) {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     }
+
+    const recordDateFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric"
+    });
 
     // 日付のみの文字列は日付として解釈し、ISO時刻は家計簿の日本時間で解釈する。
     function getRecordMonth(item) {
@@ -1004,9 +1089,8 @@
       }
       const d = new Date(date);
       if (Number.isNaN(d.getTime())) return null;
-      const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
-        timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric"
-      }).formatToParts(d).filter(p => p.type !== "literal").map(p => [p.type, Number(p.value)]));
+      const parts = Object.fromEntries(recordDateFormatter.formatToParts(d)
+        .filter(p => p.type !== "literal").map(p => [p.type, Number(p.value)]));
       return { year: parts.year, month: parts.month - 1, day: parts.day };
     }
 
@@ -1057,22 +1141,38 @@
     }
 
     let busyOperation = false;
+    let latestLoadId = 0;
+
+    function setBusyOperation(isBusy) {
+      busyOperation = isBusy;
+      for (const container of document.querySelectorAll("#inputBar, #editModal, #receiptModal")) {
+        for (const control of container.querySelectorAll("input, select, button")) {
+          control.disabled = isBusy;
+        }
+      }
+    }
 
     async function loadData() {
+      const loadId = ++latestLoadId;
       const statusElement = document.getElementById("statusMessage");
       statusElement.textContent = "読み込み中...";
       try {
         const result = await requestGAS();
+        if (loadId !== latestLoadId) return;
         const records = Array.isArray(result) ? result
           : (Array.isArray(result?.data) ? result.data
             : (Array.isArray(result?.records) ? result.records : null));
         if (!records) throw new Error("取得データが配列ではありません。GASの返却形式を確認してください。");
+        if (records.some(item => !item || typeof item !== "object" || Array.isArray(item))) {
+          throw new Error("取得データに不正な記録が含まれています。GASの返却形式を確認してください。");
+        }
         allData = records;
         statusElement.textContent = "";
         renderUI();
         if (document.getElementById("tabAnalytics").classList.contains("active")) renderAnalytics();
         if (document.getElementById("tabIndividual").classList.contains("active")) renderIndividualView();
       } catch (err) {
+        if (loadId !== latestLoadId) return;
         statusElement.textContent = `データの取得に失敗しました: ${err.message}`;
         console.error(err);
       }
@@ -1083,8 +1183,8 @@
       const fullListElement = document.getElementById("fullHistoryList");
       const statusElement = document.getElementById("statusMessage");
       
-      listElement.innerHTML = "";
-      fullListElement.innerHTML = "";
+      const recentItems = document.createDocumentFragment();
+      const historyItems = document.createDocumentFragment();
 
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -1178,9 +1278,11 @@
           li.append(main, right);
           return li;
         };
-        listElement.appendChild(buildRecordItem());
-        fullListElement.appendChild(buildRecordItem());
+        recentItems.appendChild(buildRecordItem());
+        historyItems.appendChild(buildRecordItem());
       });
+      listElement.replaceChildren(recentItems);
+      fullListElement.replaceChildren(historyItems);
 
       const totalInc = yukiInc + renaInc;
       const totalBalance = totalInc - expTotal;
@@ -1477,17 +1579,21 @@
       });
 
       // 3. 過去6ヶ月の推移 グラフ
+      const monthlyExpenses = new Map();
+      for (const item of allData) {
+        if (item.type !== "支出") continue;
+        const date = getRecordMonth(item);
+        if (!date) continue;
+        const key = `${date.year}-${date.month}`;
+        monthlyExpenses.set(key, (monthlyExpenses.get(key) || 0) + parseMoney(item.amount));
+      }
       const trendLabels = [];
       const trendData = [];
       for (let i = 5; i >= 0; i--) {
         const d = new Date(year, month - i, 1);
         trendLabels.push(`${d.getMonth() + 1}月`);
 
-        const mExp = allData.filter(item => {
-          return item.type === "支出" && isRecordInMonth(item, d.getFullYear(), d.getMonth());
-        }).reduce((sum, item) => sum + (parseMoney(item.amount)), 0);
-
-        trendData.push(mExp);
+        trendData.push(monthlyExpenses.get(`${d.getFullYear()}-${d.getMonth()}`) || 0);
       }
 
       const ctxTrend = document.getElementById('trendChart').getContext('2d');
@@ -1505,6 +1611,7 @@
     /* 編集モーダル制御 */
     let selectedEditRecordId = null;
     function openEditModal(rowIndex, cat, memo, amount, recordId, recordType) {
+      if (busyOperation) return;
       selectedEditRecordId = recordId == null || recordId === "" ? null : String(recordId);
       document.getElementById("editRowIndex").value = rowIndex;
       const editCategory = document.getElementById("editCategory");
@@ -1542,7 +1649,7 @@
         alert("カテゴリと、1円以上の整数の金額を確認してください。");
         return;
       }
-      busyOperation = true;
+      setBusyOperation(true);
       document.getElementById("statusMessage").textContent = "更新中...";
       try {
         await requestGAS({ action: "update", rowIndex, ...(selectedEditRecordId ? { id: selectedEditRecordId } : {}), category: cat, memo, amount: String(amount) });
@@ -1551,7 +1658,7 @@
       } catch (err) {
         showError("更新に失敗しました。データは再取得してご確認ください。", err);
       } finally {
-        busyOperation = false;
+        setBusyOperation(false);
       }
     }
 
@@ -1584,8 +1691,7 @@
         pendingSingleAdd = { signature, id: createClientRecordId() };
       }
       const payload = { action: "add", ...values, id: pendingSingleAdd.id };
-      busyOperation = true;
-      document.getElementById("addRecordBtn").disabled = true;
+      setBusyOperation(true);
       document.getElementById("statusMessage").textContent = "送信中...";
       try {
         await requestGAS(payload);
@@ -1597,8 +1703,33 @@
       } catch (err) {
         showError("登録に失敗しました。重複登録を避けるため、履歴を確認してから再送信してください。", err);
       } finally {
-        busyOperation = false;
-        document.getElementById("addRecordBtn").disabled = false;
+        setBusyOperation(false);
+      }
+    }
+
+    async function prepareReceiptImage(file) {
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = () => reject(new Error("写真を開けませんでした。JPEG・PNG、またはレシートのスクリーンショットを選択してください。"));
+          image.src = objectUrl;
+        });
+        const scale = Math.min(1, 2000 / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("画像を準備できませんでした。ブラウザを再読み込みしてください。");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const jpeg = canvas.toDataURL("image/jpeg", 0.85);
+        if (!jpeg.startsWith("data:image/jpeg;base64,")) throw new Error("JPEGへの変換に失敗しました。");
+        return { imageData: jpeg.split(",")[1], mimeType: "image/jpeg" };
+      } finally {
+        URL.revokeObjectURL(objectUrl);
       }
     }
 
@@ -1606,17 +1737,15 @@
       const file = event.target.files?.[0];
       if (!file || busyOperation) return;
       const input = event.target;
-      busyOperation = true;
-      document.getElementById("statusMessage").textContent = "レシート解析中...";
+      setBusyOperation(true);
+      document.getElementById("statusMessage").textContent = "レシート画像を準備中...";
       try {
-        if (!file.type.startsWith("image/")) throw new Error("画像ファイルを選択してください。");
-        const base64Data = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result).split(",")[1]);
-          reader.onerror = () => reject(reader.error || new Error("画像を開けませんでした"));
-          reader.readAsDataURL(file);
-        });
-        const result = await requestGAS({ action: "analyzeReceipt", imageData: base64Data, mimeType: file.type });
+        if (!file.type.startsWith("image/") && !/\.(heic|heif|jpe?g|png|webp|gif|bmp)$/i.test(file.name || "")) {
+          throw new Error("画像ファイルを選択してください。");
+        }
+        const image = await prepareReceiptImage(file);
+        document.getElementById("statusMessage").textContent = "レシート解析中...";
+        const result = await requestGAS({ action: "analyzeReceipt", ...image }, 90000);
         document.getElementById("statusMessage").textContent = "";
         if (Array.isArray(result?.items) && result.items.length) showReceiptModal(result.items);
         else alert("項目が読み取れませんでした。手動で入力してください。");
@@ -1624,7 +1753,7 @@
         showError("レシート解析に失敗しました。", err);
       } finally {
         input.value = ""; // 同じ写真の再アップロードが可能
-        busyOperation = false;
+        setBusyOperation(false);
       }
     }
 
@@ -1682,7 +1811,7 @@
         pendingReceiptAdd = { signature, ids: records.map(() => createClientRecordId()) };
       }
       records.forEach((r, i) => { r.id = pendingReceiptAdd.ids[i]; });
-      busyOperation = true;
+      setBusyOperation(true);
       document.getElementById("statusMessage").textContent = "一括登録中...";
       try {
         // GAS側が records 配列による一括追加に対応する必要がある（元の仕様）。
@@ -1693,7 +1822,7 @@
       } catch (err) {
         showError("レシートの一括登録に失敗しました。", err);
       } finally {
-        busyOperation = false;
+        setBusyOperation(false);
       }
     }
 
@@ -1702,7 +1831,7 @@
       const n = Number(rowIndex);
       if (!Number.isSafeInteger(n) || n < 2) { alert("削除対象が不正です。再読み込みしてください。"); return; }
       if (!confirm("この記録をスプレッドシートから完全に削除しますか？")) return;
-      busyOperation = true;
+      setBusyOperation(true);
       document.getElementById("statusMessage").textContent = "削除中...";
       try {
         await requestGAS({ action: "delete", rowIndex: n, ...(recordId ? { id: String(recordId) } : {}) });
@@ -1710,7 +1839,7 @@
       } catch (err) {
         showError("削除に失敗しました。", err);
       } finally {
-        busyOperation = false;
+        setBusyOperation(false);
       }
     }
 

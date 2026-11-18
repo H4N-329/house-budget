@@ -1,0 +1,10 @@
+{
+  "name": "futari-house-budget",
+  "private": true,
+  "scripts": {
+    "test": "TZ=Asia/Tokyo node --test tests/*.test.cjs"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.12"
+  }
+}
