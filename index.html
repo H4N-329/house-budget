@@ -1185,6 +1185,7 @@
       
       const recentItems = document.createDocumentFragment();
       const historyItems = document.createDocumentFragment();
+      const historyRecords = [];
 
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -1238,6 +1239,7 @@
         const isIncome = item.type === "収入";
         const isShared = cat.startsWith("共通：");
         const catClass = isIncome ? 'cat-income' : (isShared ? 'cat-shared' : 'cat-personal');
+        const date = displayRecordDate(item);
 
         // ユーザー入力はHTMLに埋め込まずtextContentで表示し、イベントは直接登録する。
         const buildRecordItem = () => {
@@ -1257,7 +1259,7 @@
           main.appendChild(memo);
           const sub = document.createElement("div");
           sub.className = "record-sub";
-          sub.textContent = `${displayRecordDate(item)} (${String(item.user || "")})`;
+          sub.textContent = `${date} (${String(item.user || "")})`;
           main.appendChild(sub);
           const right = document.createElement("div");
           right.className = "record-right";
@@ -1279,8 +1281,10 @@
           return li;
         };
         recentItems.appendChild(buildRecordItem());
-        historyItems.appendChild(buildRecordItem());
+        historyRecords.push({ date, element: buildRecordItem() });
       });
+      historyRecords.sort((a, b) => b.date.localeCompare(a.date));
+      historyRecords.forEach(({ element }) => historyItems.appendChild(element));
       listElement.replaceChildren(recentItems);
       fullListElement.replaceChildren(historyItems);
 

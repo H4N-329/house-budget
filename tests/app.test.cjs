@@ -123,6 +123,28 @@ test('dates include JST boundaries and reject nonexistent calendar days', () => 
   assert.equal(app.evaluate('getRecordMonth({date:"2024-02-29"}).day'), 29);
 });
 
+test('monthly history sorts by transaction date with newest days first', () => {
+  const app = createApp();
+  const expense = { type: '支出', category: '共通：食料品', amount: 100 };
+  app.setRecords([
+    { ...expense, date: '2026-11-20', memo: '月内で最新' },
+    { ...expense, date: '2026/11/3', memo: '後から追加した過去日' },
+    { ...expense, date: '2026-11-09T15:00:00Z', memo: '日本時間で10日' },
+    { ...expense, date: '2026-11-10', memo: '同じ日の新規行' },
+    { ...expense, date: '2026-10-31', memo: '前月' }
+  ]);
+  app.evaluate('renderUI();');
+  const memos = list => Array.from(
+    app.document.querySelectorAll(`#${list} .record-memo`), item => item.textContent
+  );
+  assert.deepEqual(memos('fullHistoryList'), [
+    '月内で最新', '同じ日の新規行', '日本時間で10日', '後から追加した過去日'
+  ]);
+  assert.deepEqual(memos('dataList'), [
+    '同じ日の新規行', '日本時間で10日', '後から追加した過去日', '月内で最新'
+  ]);
+});
+
 test('month navigation from the 31st reaches the next month', () => {
   const app = createApp();
   app.evaluate('currentDate = new Date(2026, 0, 31); changeMonth(1);');
