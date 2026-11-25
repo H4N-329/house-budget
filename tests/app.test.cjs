@@ -145,6 +145,42 @@ test('monthly history sorts by transaction date with newest days first', () => {
   ]);
 });
 
+test('monthly history filters by the person on each record and keeps the choice across months', () => {
+  const app = createApp();
+  const expense = { type: '支出', category: '共通：食料品', amount: 100 };
+  app.setRecords([
+    { ...expense, date: '2026-11-20', user: 'ゆうき', memo: '共通費' },
+    { ...expense, date: '2026-11-12', user: 'れな', category: '個人：飲食', memo: '個人費' },
+    { type: '収入', category: '手取り給与', amount: 1000, date: '2026-11-03', user: 'ゆうき', memo: '収入' },
+    { ...expense, date: '2026-10-31', user: 'ゆうき', memo: '前月の共通費' }
+  ]);
+  app.evaluate('renderUI();');
+
+  const [all, yuki, rena] = app.document.querySelectorAll('#historyUserFilter button');
+  const history = () => Array.from(app.document.querySelectorAll('#fullHistoryList .record-memo'), item => item.textContent);
+  const emptyMessage = app.document.getElementById('historyEmptyMessage');
+  const summary = app.document.getElementById('totalBalance');
+  const initialBalance = summary.textContent;
+
+  assert.deepEqual(history(), ['共通費', '個人費', '収入']);
+  yuki.click();
+  assert.equal(yuki.getAttribute('aria-pressed'), 'true');
+  assert.equal(all.getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(history(), ['共通費', '収入']);
+  assert.equal(app.document.querySelectorAll('#dataList li').length, 3);
+  assert.equal(summary.textContent, initialBalance);
+  rena.click();
+  assert.deepEqual(history(), ['個人費']);
+
+  app.evaluate('changeMonth(-1);');
+  assert.equal(rena.getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(history(), []);
+  assert.equal(emptyMessage.textContent, 'この月のれなの記録はありません');
+  all.click();
+  assert.deepEqual(history(), ['前月の共通費']);
+  assert.equal(emptyMessage.textContent, '');
+});
+
 test('month navigation from the 31st reaches the next month', () => {
   const app = createApp();
   app.evaluate('currentDate = new Date(2026, 0, 31); changeMonth(1);');

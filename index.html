@@ -260,7 +260,7 @@
       cursor: pointer;
     }
 
-    /* 人物切り替えスイッチ（個別タブ用） */
+    /* 人物切り替えスイッチ */
     .user-switch-container {
       display: flex;
       background: rgba(0,0,0,0.06);
@@ -286,6 +286,11 @@
     }
     .user-switch-btn.active-rena {
       background: var(--blue-tag);
+      color: white;
+    }
+    #historyUserFilter .user-switch-btn { min-height: 44px; color: var(--text-dark); }
+    #historyUserFilter .user-switch-btn[aria-pressed="true"] {
+      background: #2f6549;
       color: white;
     }
 
@@ -513,7 +518,13 @@
   <!-- 【タブ4】 履歴画面 -->
   <div id="tabHistory" class="tab-content">
     <div class="card">
-      <div class="card-title">月間全履歴</div>
+      <div class="card-title">月間履歴</div>
+      <div id="historyUserFilter" class="user-switch-container" role="group" aria-label="履歴を人物で絞り込む">
+        <button type="button" class="user-switch-btn" value="" aria-pressed="true" aria-controls="fullHistoryList">全員</button>
+        <button type="button" class="user-switch-btn" value="ゆうき" aria-pressed="false" aria-controls="fullHistoryList">ゆうき</button>
+        <button type="button" class="user-switch-btn" value="れな" aria-pressed="false" aria-controls="fullHistoryList">れな</button>
+      </div>
+      <p id="historyEmptyMessage" class="empty-msg" role="status"></p>
       <ul id="fullHistoryList" class="record-list"></ul>
     </div>
   </div>
@@ -650,6 +661,7 @@
     let currentUser = "ゆうき";
     let selectedIndivUser = "ゆうき";
     let allData = [];
+    let monthlyHistoryRecords = null;
     
     // Charts
     let chartHome = null;
@@ -692,6 +704,16 @@
     const incomeCategories = [
       "手取り給与", "ボーナス", "副収入", "その他収入"
     ];
+
+    const historyFilterButtons = document.querySelectorAll("#historyUserFilter button");
+    for (const button of historyFilterButtons) {
+      button.addEventListener("click", () => {
+        for (const option of historyFilterButtons) {
+          option.setAttribute("aria-pressed", String(option === button));
+        }
+        renderMonthlyHistory();
+      });
+    }
 
     window.onload = () => {
       document.getElementById("inputDate").value = formatDateInput(currentDate);
@@ -1178,13 +1200,24 @@
       }
     }
 
+    function renderMonthlyHistory() {
+      if (!monthlyHistoryRecords) return;
+      const selectedUser = document.querySelector('#historyUserFilter [aria-pressed="true"]').getAttribute("value");
+      const records = selectedUser
+        ? monthlyHistoryRecords.filter(record => record.user === selectedUser)
+        : monthlyHistoryRecords;
+      const historyItems = document.createDocumentFragment();
+      records.forEach(({ element }) => historyItems.appendChild(element));
+      document.getElementById("fullHistoryList").replaceChildren(historyItems);
+      document.getElementById("historyEmptyMessage").textContent = records.length ? ""
+        : (selectedUser ? `この月の${selectedUser}の記録はありません` : "この月の記録はありません");
+    }
+
     function renderUI() {
       const listElement = document.getElementById("dataList");
-      const fullListElement = document.getElementById("fullHistoryList");
       const statusElement = document.getElementById("statusMessage");
       
       const recentItems = document.createDocumentFragment();
-      const historyItems = document.createDocumentFragment();
       const historyRecords = [];
 
       const year = currentDate.getFullYear();
@@ -1281,12 +1314,11 @@
           return li;
         };
         recentItems.appendChild(buildRecordItem());
-        historyRecords.push({ date, element: buildRecordItem() });
+        historyRecords.push({ date, user: item.user, element: buildRecordItem() });
       });
-      historyRecords.sort((a, b) => b.date.localeCompare(a.date));
-      historyRecords.forEach(({ element }) => historyItems.appendChild(element));
+      monthlyHistoryRecords = historyRecords.sort((a, b) => b.date.localeCompare(a.date));
       listElement.replaceChildren(recentItems);
-      fullListElement.replaceChildren(historyItems);
+      renderMonthlyHistory();
 
       const totalInc = yukiInc + renaInc;
       const totalBalance = totalInc - expTotal;
